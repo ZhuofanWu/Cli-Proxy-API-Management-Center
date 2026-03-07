@@ -9,11 +9,7 @@ import type { GeminiKeyConfig, ProviderKeyConfig, OpenAIProviderConfig } from '@
 import type { AuthFileItem } from '@/types/authFile';
 import type { CredentialInfo } from '@/types/sourceInfo';
 import { buildSourceInfoMap, resolveSourceDisplay } from '@/utils/sourceResolver';
-import {
-  collectUsageDetails,
-  extractTotalTokens,
-  normalizeAuthIndex
-} from '@/utils/usage';
+import { collectUsageDetails, extractTotalTokens, normalizeAuthIndex } from '@/utils/usage';
 import { downloadBlob } from '@/utils/download';
 import styles from '@/pages/UsagePage.module.scss';
 
@@ -68,10 +64,11 @@ export function RequestEventsDetailsCard({
   claudeConfigs,
   codexConfigs,
   vertexConfigs,
-  openaiProviders
+  openaiProviders,
 }: RequestEventsDetailsCardProps) {
   const { t, i18n } = useTranslation();
 
+  const [collapsed, setCollapsed] = useState(true);
   const [modelFilter, setModelFilter] = useState(ALL_FILTER);
   const [sourceFilter, setSourceFilter] = useState(ALL_FILTER);
   const [authIndexFilter, setAuthIndexFilter] = useState(ALL_FILTER);
@@ -91,7 +88,7 @@ export function RequestEventsDetailsCard({
           if (!key) return;
           map.set(key, {
             name: file.name || key,
-            type: (file.type || file.provider || '').toString()
+            type: (file.type || file.provider || '').toString(),
           });
         });
         setAuthFileMap(map);
@@ -131,7 +128,12 @@ export function RequestEventsDetailsCard({
           authIndexRaw === null || authIndexRaw === undefined || authIndexRaw === ''
             ? '-'
             : String(authIndexRaw);
-        const sourceInfo = resolveSourceDisplay(sourceRaw, authIndexRaw, sourceInfoMap, authFileMap);
+        const sourceInfo = resolveSourceDisplay(
+          sourceRaw,
+          authIndexRaw,
+          sourceInfoMap,
+          authFileMap
+        );
         const source = sourceInfo.displayName;
         const sourceType = sourceInfo.type;
         const model = String(detail.__modelName ?? '').trim() || '-';
@@ -162,7 +164,7 @@ export function RequestEventsDetailsCard({
           outputTokens,
           reasoningTokens,
           cachedTokens,
-          totalTokens
+          totalTokens,
         };
       })
       .sort((a, b) => b.timestampMs - a.timestampMs);
@@ -173,8 +175,8 @@ export function RequestEventsDetailsCard({
       { value: ALL_FILTER, label: t('usage_stats.filter_all') },
       ...Array.from(new Set(rows.map((row) => row.model))).map((model) => ({
         value: model,
-        label: model
-      }))
+        label: model,
+      })),
     ],
     [rows, t]
   );
@@ -184,8 +186,8 @@ export function RequestEventsDetailsCard({
       { value: ALL_FILTER, label: t('usage_stats.filter_all') },
       ...Array.from(new Set(rows.map((row) => row.source))).map((source) => ({
         value: source,
-        label: source
-      }))
+        label: source,
+      })),
     ],
     [rows, t]
   );
@@ -195,8 +197,8 @@ export function RequestEventsDetailsCard({
       { value: ALL_FILTER, label: t('usage_stats.filter_all') },
       ...Array.from(new Set(rows.map((row) => row.authIndex))).map((authIndex) => ({
         value: authIndex,
-        label: authIndex
-      }))
+        label: authIndex,
+      })),
     ],
     [rows, t]
   );
@@ -223,8 +225,10 @@ export function RequestEventsDetailsCard({
   const filteredRows = useMemo(
     () =>
       rows.filter((row) => {
-        const modelMatched = effectiveModelFilter === ALL_FILTER || row.model === effectiveModelFilter;
-        const sourceMatched = effectiveSourceFilter === ALL_FILTER || row.source === effectiveSourceFilter;
+        const modelMatched =
+          effectiveModelFilter === ALL_FILTER || row.model === effectiveModelFilter;
+        const sourceMatched =
+          effectiveSourceFilter === ALL_FILTER || row.source === effectiveSourceFilter;
         const authIndexMatched =
           effectiveAuthIndexFilter === ALL_FILTER || row.authIndex === effectiveAuthIndexFilter;
         return modelMatched && sourceMatched && authIndexMatched;
@@ -232,10 +236,7 @@ export function RequestEventsDetailsCard({
     [effectiveAuthIndexFilter, effectiveModelFilter, effectiveSourceFilter, rows]
   );
 
-  const renderedRows = useMemo(
-    () => filteredRows.slice(0, MAX_RENDERED_EVENTS),
-    [filteredRows]
-  );
+  const renderedRows = useMemo(() => filteredRows.slice(0, MAX_RENDERED_EVENTS), [filteredRows]);
 
   const hasActiveFilters =
     effectiveModelFilter !== ALL_FILTER ||
@@ -246,6 +247,10 @@ export function RequestEventsDetailsCard({
     setModelFilter(ALL_FILTER);
     setSourceFilter(ALL_FILTER);
     setAuthIndexFilter(ALL_FILTER);
+  };
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => !prev);
   };
 
   const handleExportCsv = () => {
@@ -262,7 +267,7 @@ export function RequestEventsDetailsCard({
       'output_tokens',
       'reasoning_tokens',
       'cached_tokens',
-      'total_tokens'
+      'total_tokens',
     ];
 
     const csvRows = filteredRows.map((row) =>
@@ -277,7 +282,7 @@ export function RequestEventsDetailsCard({
         row.outputTokens,
         row.reasoningTokens,
         row.cachedTokens,
-        row.totalTokens
+        row.totalTokens,
       ]
         .map((value) => encodeCsv(value))
         .join(',')
@@ -287,7 +292,7 @@ export function RequestEventsDetailsCard({
     const fileTime = new Date().toISOString().replace(/[:.]/g, '-');
     downloadBlob({
       filename: `usage-events-${fileTime}.csv`,
-      blob: new Blob([content], { type: 'text/csv;charset=utf-8' })
+      blob: new Blob([content], { type: 'text/csv;charset=utf-8' }),
     });
   };
 
@@ -306,15 +311,15 @@ export function RequestEventsDetailsCard({
         output_tokens: row.outputTokens,
         reasoning_tokens: row.reasoningTokens,
         cached_tokens: row.cachedTokens,
-        total_tokens: row.totalTokens
-      }
+        total_tokens: row.totalTokens,
+      },
     }));
 
     const content = JSON.stringify(payload, null, 2);
     const fileTime = new Date().toISOString().replace(/[:.]/g, '-');
     downloadBlob({
       filename: `usage-events-${fileTime}.json`,
-      blob: new Blob([content], { type: 'application/json;charset=utf-8' })
+      blob: new Blob([content], { type: 'application/json;charset=utf-8' }),
     });
   };
 
@@ -323,150 +328,175 @@ export function RequestEventsDetailsCard({
       title={t('usage_stats.request_events_title')}
       extra={
         <div className={styles.requestEventsActions}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClearFilters}
-            disabled={!hasActiveFilters}
-          >
-            {t('usage_stats.clear_filters')}
+          <Button variant="ghost" size="sm" onClick={toggleCollapsed}>
+            {collapsed
+              ? t('usage_stats.request_events_expand')
+              : t('usage_stats.request_events_collapse')}
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleExportCsv}
-            disabled={filteredRows.length === 0}
-          >
-            {t('usage_stats.export_csv')}
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleExportJson}
-            disabled={filteredRows.length === 0}
-          >
-            {t('usage_stats.export_json')}
-          </Button>
+          {!collapsed && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearFilters}
+                disabled={!hasActiveFilters}
+              >
+                {t('usage_stats.clear_filters')}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleExportCsv}
+                disabled={filteredRows.length === 0}
+              >
+                {t('usage_stats.export_csv')}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleExportJson}
+                disabled={filteredRows.length === 0}
+              >
+                {t('usage_stats.export_json')}
+              </Button>
+            </>
+          )}
         </div>
       }
     >
-      <div className={styles.requestEventsToolbar}>
-        <div className={styles.requestEventsFilterItem}>
-          <span className={styles.requestEventsFilterLabel}>
-            {t('usage_stats.request_events_filter_model')}
-          </span>
-          <Select
-            value={effectiveModelFilter}
-            options={modelOptions}
-            onChange={setModelFilter}
-            className={styles.requestEventsSelect}
-            ariaLabel={t('usage_stats.request_events_filter_model')}
-            fullWidth={false}
-          />
+      {collapsed ? (
+        <div className={styles.requestEventsCollapsedHint}>
+          {loading
+            ? t('common.loading')
+            : rows.length === 0
+              ? t('usage_stats.request_events_empty_desc')
+              : t('usage_stats.request_events_collapsed_hint', { count: rows.length })}
         </div>
-        <div className={styles.requestEventsFilterItem}>
-          <span className={styles.requestEventsFilterLabel}>
-            {t('usage_stats.request_events_filter_source')}
-          </span>
-          <Select
-            value={effectiveSourceFilter}
-            options={sourceOptions}
-            onChange={setSourceFilter}
-            className={styles.requestEventsSelect}
-            ariaLabel={t('usage_stats.request_events_filter_source')}
-            fullWidth={false}
-          />
-        </div>
-        <div className={styles.requestEventsFilterItem}>
-          <span className={styles.requestEventsFilterLabel}>
-            {t('usage_stats.request_events_filter_auth_index')}
-          </span>
-          <Select
-            value={effectiveAuthIndexFilter}
-            options={authIndexOptions}
-            onChange={setAuthIndexFilter}
-            className={styles.requestEventsSelect}
-            ariaLabel={t('usage_stats.request_events_filter_auth_index')}
-            fullWidth={false}
-          />
-        </div>
-      </div>
-
-      {loading && rows.length === 0 ? (
-        <div className={styles.hint}>{t('common.loading')}</div>
-      ) : rows.length === 0 ? (
-        <EmptyState
-          title={t('usage_stats.request_events_empty_title')}
-          description={t('usage_stats.request_events_empty_desc')}
-        />
-      ) : filteredRows.length === 0 ? (
-        <EmptyState
-          title={t('usage_stats.request_events_no_result_title')}
-          description={t('usage_stats.request_events_no_result_desc')}
-        />
       ) : (
         <>
-          <div className={styles.requestEventsMeta}>
-            <span>{t('usage_stats.request_events_count', { count: filteredRows.length })}</span>
-            {filteredRows.length > MAX_RENDERED_EVENTS && (
-              <span className={styles.requestEventsLimitHint}>
-                {t('usage_stats.request_events_limit_hint', {
-                  shown: MAX_RENDERED_EVENTS,
-                  total: filteredRows.length
-                })}
+          <div className={styles.requestEventsToolbar}>
+            <div className={styles.requestEventsFilterItem}>
+              <span className={styles.requestEventsFilterLabel}>
+                {t('usage_stats.request_events_filter_model')}
               </span>
-            )}
+              <Select
+                value={effectiveModelFilter}
+                options={modelOptions}
+                onChange={setModelFilter}
+                className={styles.requestEventsSelect}
+                ariaLabel={t('usage_stats.request_events_filter_model')}
+                fullWidth={false}
+              />
+            </div>
+            <div className={styles.requestEventsFilterItem}>
+              <span className={styles.requestEventsFilterLabel}>
+                {t('usage_stats.request_events_filter_source')}
+              </span>
+              <Select
+                value={effectiveSourceFilter}
+                options={sourceOptions}
+                onChange={setSourceFilter}
+                className={styles.requestEventsSelect}
+                ariaLabel={t('usage_stats.request_events_filter_source')}
+                fullWidth={false}
+              />
+            </div>
+            <div className={styles.requestEventsFilterItem}>
+              <span className={styles.requestEventsFilterLabel}>
+                {t('usage_stats.request_events_filter_auth_index')}
+              </span>
+              <Select
+                value={effectiveAuthIndexFilter}
+                options={authIndexOptions}
+                onChange={setAuthIndexFilter}
+                className={styles.requestEventsSelect}
+                ariaLabel={t('usage_stats.request_events_filter_auth_index')}
+                fullWidth={false}
+              />
+            </div>
           </div>
 
-          <div className={styles.requestEventsTableWrapper}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>{t('usage_stats.request_events_timestamp')}</th>
-                  <th>{t('usage_stats.model_name')}</th>
-                  <th>{t('usage_stats.request_events_source')}</th>
-                  <th>{t('usage_stats.request_events_auth_index')}</th>
-                  <th>{t('usage_stats.request_events_result')}</th>
-                  <th>{t('usage_stats.input_tokens')}</th>
-                  <th>{t('usage_stats.output_tokens')}</th>
-                  <th>{t('usage_stats.reasoning_tokens')}</th>
-                  <th>{t('usage_stats.cached_tokens')}</th>
-                  <th>{t('usage_stats.total_tokens')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {renderedRows.map((row) => (
-                  <tr key={row.id}>
-                    <td title={row.timestamp} className={styles.requestEventsTimestamp}>
-                      {row.timestampLabel}
-                    </td>
-                    <td className={styles.modelCell}>{row.model}</td>
-                    <td className={styles.requestEventsSourceCell} title={row.source}>
-                      <span>{row.source}</span>
-                      {row.sourceType && (
-                        <span className={styles.credentialType}>{row.sourceType}</span>
-                      )}
-                    </td>
-                    <td className={styles.requestEventsAuthIndex} title={row.authIndex}>
-                      {row.authIndex}
-                    </td>
-                    <td>
-                      <span
-                        className={row.failed ? styles.requestEventsResultFailed : styles.requestEventsResultSuccess}
-                      >
-                        {row.failed ? t('stats.failure') : t('stats.success')}
-                      </span>
-                    </td>
-                    <td>{row.inputTokens.toLocaleString()}</td>
-                    <td>{row.outputTokens.toLocaleString()}</td>
-                    <td>{row.reasoningTokens.toLocaleString()}</td>
-                    <td>{row.cachedTokens.toLocaleString()}</td>
-                    <td>{row.totalTokens.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {loading && rows.length === 0 ? (
+            <div className={styles.hint}>{t('common.loading')}</div>
+          ) : rows.length === 0 ? (
+            <EmptyState
+              title={t('usage_stats.request_events_empty_title')}
+              description={t('usage_stats.request_events_empty_desc')}
+            />
+          ) : filteredRows.length === 0 ? (
+            <EmptyState
+              title={t('usage_stats.request_events_no_result_title')}
+              description={t('usage_stats.request_events_no_result_desc')}
+            />
+          ) : (
+            <>
+              <div className={styles.requestEventsMeta}>
+                <span>{t('usage_stats.request_events_count', { count: filteredRows.length })}</span>
+                {filteredRows.length > MAX_RENDERED_EVENTS && (
+                  <span className={styles.requestEventsLimitHint}>
+                    {t('usage_stats.request_events_limit_hint', {
+                      shown: MAX_RENDERED_EVENTS,
+                      total: filteredRows.length,
+                    })}
+                  </span>
+                )}
+              </div>
+
+              <div className={styles.requestEventsTableWrapper}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>{t('usage_stats.request_events_timestamp')}</th>
+                      <th>{t('usage_stats.model_name')}</th>
+                      <th>{t('usage_stats.request_events_source')}</th>
+                      <th>{t('usage_stats.request_events_auth_index')}</th>
+                      <th>{t('usage_stats.request_events_result')}</th>
+                      <th>{t('usage_stats.input_tokens')}</th>
+                      <th>{t('usage_stats.output_tokens')}</th>
+                      <th>{t('usage_stats.reasoning_tokens')}</th>
+                      <th>{t('usage_stats.cached_tokens')}</th>
+                      <th>{t('usage_stats.total_tokens')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {renderedRows.map((row) => (
+                      <tr key={row.id}>
+                        <td title={row.timestamp} className={styles.requestEventsTimestamp}>
+                          {row.timestampLabel}
+                        </td>
+                        <td className={styles.modelCell}>{row.model}</td>
+                        <td className={styles.requestEventsSourceCell} title={row.source}>
+                          <span>{row.source}</span>
+                          {row.sourceType && (
+                            <span className={styles.credentialType}>{row.sourceType}</span>
+                          )}
+                        </td>
+                        <td className={styles.requestEventsAuthIndex} title={row.authIndex}>
+                          {row.authIndex}
+                        </td>
+                        <td>
+                          <span
+                            className={
+                              row.failed
+                                ? styles.requestEventsResultFailed
+                                : styles.requestEventsResultSuccess
+                            }
+                          >
+                            {row.failed ? t('stats.failure') : t('stats.success')}
+                          </span>
+                        </td>
+                        <td>{row.inputTokens.toLocaleString()}</td>
+                        <td>{row.outputTokens.toLocaleString()}</td>
+                        <td>{row.reasoningTokens.toLocaleString()}</td>
+                        <td>{row.cachedTokens.toLocaleString()}</td>
+                        <td>{row.totalTokens.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </>
       )}
     </Card>

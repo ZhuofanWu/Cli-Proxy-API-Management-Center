@@ -4,24 +4,24 @@
 
 // 浅色主题（默认）
 :root {
-  // 极简暖灰：浅色模式
-  --bg-secondary: #faf9f5; // 页面背景（纸感）
-  --bg-primary: #f0eee8; // 容器/卡片背景
-  --bg-tertiary: #e9e6df; // hover/次级背景
+  // 浅色主题：白底
+  --bg-secondary: #ffffff; // 页面背景
+  --bg-primary: #ffffff; // 容器/卡片背景
+  --bg-tertiary: #f4f6f8; // hover/次级背景
   --bg-hover: var(--bg-tertiary);
-  --bg-quinary: #f6f4ee;
+  --bg-quinary: #f8fafc;
   --bg-error-light: rgba(198, 87, 70, 0.1);
 
-  --text-primary: #2d2a26;
-  --text-secondary: #6d6760;
-  --text-tertiary: #a29c95;
-  --text-quaternary: #c0bab3;
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --text-quaternary: #9ca3af;
   --text-muted: var(--text-tertiary);
 
-  --border-color: #e3e1db; // 边框/分割线
+  --border-color: #e5e7eb; // 边框/分割线
   --border-secondary: var(--border-color);
-  --border-primary: #d5d2cb;
-  --border-hover: #cecac4;
+  --border-primary: #d1d5db;
+  --border-hover: #cbd5e1;
 
   --primary-color: #8b8680; // 行动色（主色）
   --primary-hover: #7f7a74;

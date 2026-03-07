@@ -127,8 +127,7 @@
   padding: 18px;
   background:
     radial-gradient(120% 140% at 12% 0%, var(--accent-soft) 0%, rgba(0, 0, 0, 0) 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)),
-    var(--bg-primary);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)), var(--bg-primary);
   border-radius: $radius-lg;
   border: 1px solid var(--border-color);
   display: flex;
@@ -136,7 +135,10 @@
   gap: 10px;
   min-height: 176px;
   box-shadow: var(--shadow-lg);
-  transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast;
+  transition:
+    transform $transition-fast,
+    box-shadow $transition-fast,
+    border-color $transition-fast;
   overflow: hidden;
 
   &::before {
@@ -238,6 +240,7 @@
   color: var(--text-primary);
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
+  font-family: Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
 .statValueRow {
@@ -349,7 +352,10 @@
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 
   &:hover {
     background: var(--bg-tertiary);
@@ -514,7 +520,8 @@
   border-collapse: collapse;
   font-size: 12px;
 
-  th, td {
+  th,
+  td {
     padding: 10px 12px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
@@ -906,6 +913,12 @@
   color: var(--text-tertiary);
 }
 
+.requestEventsCollapsedHint {
+  padding: 14px 0 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 .requestEventsTableWrapper {
   overflow: auto;
   max-height: 460px;
@@ -1094,7 +1107,9 @@
   width: 100%;
   height: 100%;
   border-radius: 2px;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
 
   .healthBlockWrapper:hover &,
   .healthBlockWrapper.healthBlockActive & {
