@@ -971,6 +971,7 @@
     "cost_need_usage": "暂无使用数据，无法计算花费",
     "cost_no_data": "没有可计算的花费数据",
     "credential_stats": "凭证统计",
+    "credential_stats_collapsed_hint": "当前有 {{count}} 个凭证统计项，展开后查看明细。",
     "credential_name": "凭证",
     "token_breakdown": "Token 类型分布",
     "request_events_title": "请求事件明细",

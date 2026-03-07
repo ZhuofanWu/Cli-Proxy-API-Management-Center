@@ -971,6 +971,7 @@
     "cost_need_usage": "No usage data available to calculate cost",
     "cost_no_data": "No cost data yet",
     "credential_stats": "Credential Statistics",
+    "credential_stats_collapsed_hint": "Showing {{count}} credential entries. Expand to view details.",
     "credential_name": "Credential",
     "token_breakdown": "Token Type Breakdown",
     "request_events_title": "Request Events",

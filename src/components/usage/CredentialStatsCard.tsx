@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import {
   collectUsageDetails,
@@ -49,6 +50,7 @@ export function CredentialStatsCard({
   openaiProviders,
 }: CredentialStatsCardProps) {
   const { t } = useTranslation();
+  const [collapsed, setCollapsed] = useState(true);
   const [authFileMap, setAuthFileMap] = useState<Map<string, CredentialInfo>>(new Map());
 
   // Fetch auth files for auth_index-based matching
@@ -269,57 +271,81 @@ export function CredentialStatsCard({
     return result.sort((a, b) => b.total - a.total);
   }, [usage, geminiKeys, claudeConfigs, codexConfigs, vertexConfigs, openaiProviders, authFileMap]);
 
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => !prev);
+  };
+
   return (
-    <Card title={t('usage_stats.credential_stats')} className={styles.detailsFixedCard}>
-      {loading ? (
+    <Card
+      title={t('usage_stats.credential_stats')}
+      extra={
+        <div className={styles.requestEventsActions}>
+          <Button variant="ghost" size="sm" onClick={toggleCollapsed}>
+            {collapsed
+              ? t('usage_stats.request_events_expand')
+              : t('usage_stats.request_events_collapse')}
+          </Button>
+        </div>
+      }
+      className={collapsed ? undefined : styles.detailsFixedCard}
+    >
+      {collapsed ? (
+        <div className={styles.requestEventsCollapsedHint}>
+          {loading
+            ? t('common.loading')
+            : rows.length === 0
+              ? t('usage_stats.no_data')
+              : t('usage_stats.credential_stats_collapsed_hint', { count: rows.length })}
+        </div>
+      ) : loading ? (
         <div className={styles.hint}>{t('common.loading')}</div>
       ) : rows.length > 0 ? (
         <div className={styles.detailsScroll}>
-        <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>{t('usage_stats.credential_name')}</th>
-                <th>{t('usage_stats.requests_count')}</th>
-                <th>{t('usage_stats.success_rate')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.key}>
-                  <td className={styles.modelCell}>
-                    <span>{row.displayName}</span>
-                    {row.type && (
-                      <span className={styles.credentialType}>{row.type}</span>
-                    )}
-                  </td>
-                  <td>
-                    <span className={styles.requestCountCell}>
-                      <span>{formatCompactNumber(row.total)}</span>
-                      <span className={styles.requestBreakdown}>
-                        (<span className={styles.statSuccess}>{row.success.toLocaleString()}</span>{' '}
-                        <span className={styles.statFailure}>{row.failure.toLocaleString()}</span>)
-                      </span>
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className={
-                        row.successRate >= 95
-                          ? styles.statSuccess
-                          : row.successRate >= 80
-                            ? styles.statNeutral
-                            : styles.statFailure
-                      }
-                    >
-                      {row.successRate.toFixed(1)}%
-                    </span>
-                  </td>
+          <div className={styles.tableWrapper}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>{t('usage_stats.credential_name')}</th>
+                  <th>{t('usage_stats.requests_count')}</th>
+                  <th>{t('usage_stats.success_rate')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.key}>
+                    <td className={styles.modelCell}>
+                      <span>{row.displayName}</span>
+                      {row.type && (
+                        <span className={styles.credentialType}>{row.type}</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className={styles.requestCountCell}>
+                        <span>{formatCompactNumber(row.total)}</span>
+                        <span className={styles.requestBreakdown}>
+                          (<span className={styles.statSuccess}>{row.success.toLocaleString()}</span>{' '}
+                          <span className={styles.statFailure}>{row.failure.toLocaleString()}</span>)
+                        </span>
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className={
+                          row.successRate >= 95
+                            ? styles.statSuccess
+                            : row.successRate >= 80
+                              ? styles.statNeutral
+                              : styles.statFailure
+                        }
+                      >
+                        {row.successRate.toFixed(1)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div className={styles.hint}>{t('usage_stats.no_data')}</div>
