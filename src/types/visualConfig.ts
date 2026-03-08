@@ -1,3 +1,5 @@
+import type { UsageStatisticsStorageWay } from './config';
+
 export type PayloadParamValueType = 'string' | 'number' | 'boolean' | 'json';
 export type PayloadParamValidationErrorCode =
   | 'payload_invalid_number'
@@ -67,6 +69,7 @@ export type VisualConfigValues = {
   loggingToFile: boolean;
   logsMaxTotalSizeMb: string;
   usageStatisticsEnabled: boolean;
+  usageStatisticsStorageWay: UsageStatisticsStorageWay;
   proxyUrl: string;
   forceModelPrefix: boolean;
   requestRetry: string;
@@ -103,6 +106,7 @@ export const DEFAULT_VISUAL_VALUES: VisualConfigValues = {
   loggingToFile: false,
   logsMaxTotalSizeMb: '',
   usageStatisticsEnabled: false,
+  usageStatisticsStorageWay: 'memory',
   proxyUrl: '',
   forceModelPrefix: false,
   requestRetry: '',

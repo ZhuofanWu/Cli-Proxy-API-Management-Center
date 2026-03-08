@@ -9,7 +9,7 @@ import type {
   AmpcodeModelMapping,
   AmpcodeUpstreamApiKeyMapping
 } from '@/types';
-import type { Config } from '@/types/config';
+import type { Config, UsageStatisticsStorageWay } from '@/types/config';
 import { buildHeaderObject } from '@/utils/headers';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -25,6 +25,21 @@ const normalizeBoolean = (value: unknown): boolean | undefined => {
     if (['false', '0', 'no', 'n', 'off'].includes(trimmed)) return false;
   }
   return Boolean(value);
+};
+
+const normalizeUsageStatisticsStorageWay = (
+  value: unknown
+): UsageStatisticsStorageWay | undefined => {
+  if (typeof value !== 'string') return undefined;
+
+  switch (value.trim().toLowerCase()) {
+    case 'memory':
+      return 'memory';
+    case 'sqlite':
+      return 'sqlite';
+    default:
+      return undefined;
+  }
 };
 
 const normalizeModelAliases = (models: unknown): ModelAlias[] => {
@@ -372,6 +387,11 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
 
   config.usageStatisticsEnabled = normalizeBoolean(
     raw['usage-statistics-enabled'] ?? raw.usageStatisticsEnabled
+  );
+  config.usageStatisticsStorageWay = normalizeUsageStatisticsStorageWay(
+    raw['usage_statistics_storage_way'] ??
+      raw['usage-statistics-storage-way'] ??
+      raw.usageStatisticsStorageWay
   );
   config.requestLog = normalizeBoolean(raw['request-log'] ?? raw.requestLog);
   config.loggingToFile = normalizeBoolean(raw['logging-to-file'] ?? raw.loggingToFile);

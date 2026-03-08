@@ -289,6 +289,18 @@
   background: rgba($success-color, 0.12);
 }
 
+.configBadgeMemory {
+  color: var(--primary-color);
+  border-color: rgba($primary-color, 0.24);
+  background: rgba($primary-color, 0.12);
+}
+
+.configBadgeSqlite {
+  color: $success-color;
+  border-color: rgba($success-color, 0.3);
+  background: rgba($success-color, 0.12);
+}
+
 .configBadgeUnknown {
   color: var(--text-secondary);
   background: var(--bg-primary);

@@ -11,6 +11,10 @@ import type {
 } from '@/types/visualConfig';
 import { DEFAULT_VISUAL_VALUES } from '@/types/visualConfig';
 
+function normalizeUsageStatisticsStorageWay(value: unknown): VisualConfigValues['usageStatisticsStorageWay'] {
+  return value === 'sqlite' ? 'sqlite' : 'memory';
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
@@ -500,6 +504,11 @@ export function useVisualConfig() {
         loggingToFile: Boolean(parsed['logging-to-file']),
         logsMaxTotalSizeMb: String(parsed['logs-max-total-size-mb'] ?? ''),
         usageStatisticsEnabled: Boolean(parsed['usage-statistics-enabled']),
+        usageStatisticsStorageWay: normalizeUsageStatisticsStorageWay(
+          parsed['usage_statistics_storage_way'] ??
+            parsed['usage-statistics-storage-way'] ??
+            parsed.usageStatisticsStorageWay
+        ),
 
         proxyUrl: typeof parsed['proxy-url'] === 'string' ? parsed['proxy-url'] : '',
         forceModelPrefix: Boolean(parsed['force-model-prefix']),
@@ -632,6 +641,13 @@ export function useVisualConfig() {
         setBooleanInDoc(doc, ['logging-to-file'], values.loggingToFile);
         setIntFromStringInDoc(doc, ['logs-max-total-size-mb'], values.logsMaxTotalSizeMb);
         setBooleanInDoc(doc, ['usage-statistics-enabled'], values.usageStatisticsEnabled);
+        if (
+          docHas(doc, ['usage_statistics_storage_way']) ||
+          values.usageStatisticsEnabled ||
+          values.usageStatisticsStorageWay !== 'memory'
+        ) {
+          doc.setIn(['usage_statistics_storage_way'], values.usageStatisticsStorageWay);
+        }
 
         setStringInDoc(doc, ['proxy-url'], values.proxyUrl);
         setBooleanInDoc(doc, ['force-model-prefix'], values.forceModelPrefix);

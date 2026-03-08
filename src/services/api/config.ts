@@ -3,7 +3,7 @@
  */
 
 import { apiClient } from './client';
-import type { Config } from '@/types';
+import type { Config, UsageStatisticsStorageWay } from '@/types';
 import { normalizeConfigResponse } from './transformers';
 
 export const configApi = {
@@ -57,6 +57,24 @@ export const configApi = {
    */
   updateUsageStatistics: (enabled: boolean) =>
     apiClient.put('/usage-statistics-enabled', { value: enabled }),
+
+  /**
+   * 使用统计存储位置
+   */
+  async getUsageStatisticsStorageWay(): Promise<UsageStatisticsStorageWay> {
+    const data = await apiClient.get<Record<string, unknown>>('/usage-statistics-storage-way');
+    const value =
+      data?.usage_statistics_storage_way ??
+      data?.['usage-statistics-storage-way'] ??
+      data?.usageStatisticsStorageWay;
+    return value === 'sqlite' ? 'sqlite' : 'memory';
+  },
+
+  /**
+   * 更新使用统计存储位置
+   */
+  updateUsageStatisticsStorageWay: (storageWay: UsageStatisticsStorageWay) =>
+    apiClient.put('/usage-statistics-storage-way', { value: storageWay }),
 
   /**
    * 请求日志开关

@@ -157,6 +157,9 @@
     "quota_switch_preview": "Switch to Preview Model",
     "usage_statistics_title": "Usage Statistics",
     "usage_statistics_enable": "Enable usage statistics",
+    "usage_statistics_storage_way": "Data storage location",
+    "usage_statistics_storage_way_memory": "Memory",
+    "usage_statistics_storage_way_sqlite": "SQLite",
     "logging_title": "Logging",
     "logging_to_file_enable": "Enable logging to file",
     "logs_max_total_size_title": "Log Size Limit",
@@ -1181,6 +1184,10 @@
           "logging_to_file_desc": "Save logs to files",
           "usage_statistics": "Usage Statistics",
           "usage_statistics_desc": "Collect usage statistics",
+          "usage_statistics_storage_way": "Data storage location",
+          "usage_statistics_storage_way_hint": "Choose whether usage statistics are kept in memory or persisted to SQLite.",
+          "usage_statistics_storage_way_memory": "Memory",
+          "usage_statistics_storage_way_sqlite": "SQLite",
           "logs_max_size": "Log File Size Limit (MB)"
         },
         "network": {

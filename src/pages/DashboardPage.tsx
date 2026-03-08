@@ -236,6 +236,15 @@ export function DashboardPage() {
       : routingStrategyRaw === 'fill-first'
         ? styles.configBadgeFillFirst
         : styles.configBadgeUnknown;
+  const usageStatisticsStorageWayRaw = config?.usageStatisticsStorageWay ?? 'memory';
+  const usageStatisticsStorageWayDisplay =
+    usageStatisticsStorageWayRaw === 'sqlite'
+      ? t('basic_settings.usage_statistics_storage_way_sqlite')
+      : t('basic_settings.usage_statistics_storage_way_memory');
+  const usageStatisticsStorageWayBadgeClass =
+    usageStatisticsStorageWayRaw === 'sqlite'
+      ? styles.configBadgeSqlite
+      : styles.configBadgeMemory;
 
   return (
     <div className={styles.dashboard}>
@@ -315,6 +324,14 @@ export function DashboardPage() {
               <span className={styles.configLabel}>{t('basic_settings.logging_to_file_enable')}</span>
               <span className={`${styles.configValue} ${config.loggingToFile ? styles.enabled : styles.disabled}`}>
                 {config.loggingToFile ? t('common.yes') : t('common.no')}
+              </span>
+            </div>
+            <div className={styles.configItem}>
+              <span className={styles.configLabel}>
+                {t('basic_settings.usage_statistics_storage_way')}
+              </span>
+              <span className={`${styles.configBadge} ${usageStatisticsStorageWayBadgeClass}`}>
+                {usageStatisticsStorageWayDisplay}
               </span>
             </div>
             <div className={styles.configItem}>

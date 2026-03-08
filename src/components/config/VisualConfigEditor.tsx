@@ -85,6 +85,8 @@ function Divider() {
 
 export function VisualConfigEditor({ values, validationErrors, disabled = false, onChange }: VisualConfigEditorProps) {
   const { t } = useTranslation();
+  const usageStatisticsStorageWayLabelId = useId();
+  const usageStatisticsStorageWayHintId = `${usageStatisticsStorageWayLabelId}-hint`;
   const routingStrategyLabelId = useId();
   const routingStrategyHintId = `${routingStrategyLabelId}-hint`;
   const keepaliveInputId = useId();
@@ -263,6 +265,49 @@ export function VisualConfigEditor({ values, validationErrors, disabled = false,
               onChange={(usageStatisticsEnabled) => onChange({ usageStatisticsEnabled })}
             />
           </SectionGrid>
+
+          {values.usageStatisticsEnabled && (
+            <SectionGrid>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label
+                  id={usageStatisticsStorageWayLabelId}
+                  htmlFor={`${usageStatisticsStorageWayLabelId}-select`}
+                >
+                  {t('config_management.visual.sections.system.usage_statistics_storage_way')}
+                </label>
+                <Select
+                  value={values.usageStatisticsStorageWay}
+                  options={[
+                    {
+                      value: 'memory',
+                      label: t(
+                        'config_management.visual.sections.system.usage_statistics_storage_way_memory'
+                      ),
+                    },
+                    {
+                      value: 'sqlite',
+                      label: t(
+                        'config_management.visual.sections.system.usage_statistics_storage_way_sqlite'
+                      ),
+                    },
+                  ]}
+                  disabled={disabled}
+                  id={`${usageStatisticsStorageWayLabelId}-select`}
+                  ariaLabelledBy={usageStatisticsStorageWayLabelId}
+                  ariaDescribedBy={usageStatisticsStorageWayHintId}
+                  onChange={(usageStatisticsStorageWay) =>
+                    onChange({
+                      usageStatisticsStorageWay:
+                        usageStatisticsStorageWay as VisualConfigValues['usageStatisticsStorageWay'],
+                    })
+                  }
+                />
+                <div id={usageStatisticsStorageWayHintId} className="hint">
+                  {t('config_management.visual.sections.system.usage_statistics_storage_way_hint')}
+                </div>
+              </div>
+            </SectionGrid>
+          )}
 
           <SectionGrid>
             <Input

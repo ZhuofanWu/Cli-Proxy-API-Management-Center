@@ -157,6 +157,9 @@
     "quota_switch_preview": "切换到预览模型",
     "usage_statistics_title": "使用统计",
     "usage_statistics_enable": "启用使用统计",
+    "usage_statistics_storage_way": "数据存储位置",
+    "usage_statistics_storage_way_memory": "内存",
+    "usage_statistics_storage_way_sqlite": "SQLite",
     "logging_title": "日志记录",
     "logging_to_file_enable": "启用日志记录到文件",
     "logs_max_total_size_title": "日志容量限制",
@@ -1181,6 +1184,10 @@
           "logging_to_file_desc": "将日志保存到文件",
           "usage_statistics": "使用统计",
           "usage_statistics_desc": "收集使用统计信息",
+          "usage_statistics_storage_way": "数据存储位置",
+          "usage_statistics_storage_way_hint": "选择将使用统计数据保存在内存中，或持久化到 SQLite。",
+          "usage_statistics_storage_way_memory": "内存",
+          "usage_statistics_storage_way_sqlite": "SQLite",
           "logs_max_size": "日志文件大小限制 (MB)"
         },
         "network": {

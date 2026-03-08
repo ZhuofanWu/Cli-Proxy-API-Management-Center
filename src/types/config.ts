@@ -6,6 +6,8 @@
 import type { GeminiKeyConfig, ProviderKeyConfig, OpenAIProviderConfig } from './provider';
 import type { AmpcodeConfig } from './ampcode';
 
+export type UsageStatisticsStorageWay = 'memory' | 'sqlite';
+
 export interface QuotaExceededConfig {
   switchProject?: boolean;
   switchPreviewModel?: boolean;
@@ -17,6 +19,7 @@ export interface Config {
   requestRetry?: number;
   quotaExceeded?: QuotaExceededConfig;
   usageStatisticsEnabled?: boolean;
+  usageStatisticsStorageWay?: UsageStatisticsStorageWay;
   requestLog?: boolean;
   loggingToFile?: boolean;
   logsMaxTotalSizeMb?: number;
@@ -40,6 +43,7 @@ export type RawConfigSection =
   | 'request-retry'
   | 'quota-exceeded'
   | 'usage-statistics-enabled'
+  | 'usage-statistics-storage-way'
   | 'request-log'
   | 'logging-to-file'
   | 'logs-max-total-size-mb'
