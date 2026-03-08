@@ -237,6 +237,7 @@ export function RequestEventsDetailsCard({
   );
 
   const renderedRows = useMemo(() => filteredRows.slice(0, MAX_RENDERED_EVENTS), [filteredRows]);
+  const collapsedHintCount = Math.min(rows.length, MAX_RENDERED_EVENTS);
 
   const hasActiveFilters =
     effectiveModelFilter !== ALL_FILTER ||
@@ -328,11 +329,6 @@ export function RequestEventsDetailsCard({
       title={t('usage_stats.request_events_title')}
       extra={
         <div className={styles.requestEventsActions}>
-          <Button variant="ghost" size="sm" onClick={toggleCollapsed}>
-            {collapsed
-              ? t('usage_stats.request_events_expand')
-              : t('usage_stats.request_events_collapse')}
-          </Button>
           {!collapsed && (
             <>
               <Button
@@ -361,6 +357,11 @@ export function RequestEventsDetailsCard({
               </Button>
             </>
           )}
+          <Button variant="ghost" size="sm" onClick={toggleCollapsed}>
+            {collapsed
+              ? t('usage_stats.request_events_expand')
+              : t('usage_stats.request_events_collapse')}
+          </Button>
         </div>
       }
     >
@@ -370,7 +371,7 @@ export function RequestEventsDetailsCard({
             ? t('common.loading')
             : rows.length === 0
               ? t('usage_stats.request_events_empty_desc')
-              : t('usage_stats.request_events_collapsed_hint', { count: rows.length })}
+              : t('usage_stats.request_events_collapsed_hint', { count: collapsedHintCount })}
         </div>
       ) : (
         <>
