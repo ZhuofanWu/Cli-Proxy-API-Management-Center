@@ -538,19 +538,19 @@ export function UsagePage() {
         sparklines={statCardSparklines}
       />
 
+      {/* Service Health */}
+      <ServiceHealthCard
+        usage={usage}
+        health={isSqliteUsage ? health : null}
+        loading={serviceHealthLoading}
+      />
+
       {/* Chart Line Selection */}
       <ChartLineSelector
         chartLines={chartLines}
         modelNames={modelNames}
         maxLines={MAX_CHART_LINES}
         onChange={handleChartLinesChange}
-      />
-
-      {/* Service Health */}
-      <ServiceHealthCard
-        usage={usage}
-        health={isSqliteUsage ? health : null}
-        loading={serviceHealthLoading}
       />
 
       {/* Charts Grid */}
