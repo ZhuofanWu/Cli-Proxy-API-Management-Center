@@ -69,6 +69,38 @@ export interface UsageHealthPayload {
   total_failure?: number;
 }
 
+export interface UsageRankingsApiModelItem {
+  model_name?: string;
+  requests?: number;
+  success_count?: number;
+  failure_count?: number;
+  tokens?: number;
+}
+
+export interface UsageRankingsApiItem {
+  api_name?: string;
+  total_requests?: number;
+  success_count?: number;
+  failure_count?: number;
+  total_tokens?: number;
+  total_cost?: number;
+  models?: UsageRankingsApiModelItem[];
+}
+
+export interface UsageRankingsModelItem {
+  model_name?: string;
+  requests?: number;
+  success_count?: number;
+  failure_count?: number;
+  tokens?: number;
+  cost?: number;
+}
+
+export interface UsageRankingsPayload {
+  api_rankings?: UsageRankingsApiItem[];
+  model_rankings?: UsageRankingsModelItem[];
+}
+
 export type UsageChartGranularity = 'hour' | 'day';
 export type UsageTokenBreakdownGranularity = UsageChartGranularity;
 export type UsageCostTrendGranularity = UsageChartGranularity;
@@ -121,6 +153,12 @@ export const usageApi = {
   getUsageHealth: () =>
     apiClient.get<UsageHealthPayload>('/usage/health', {
       timeout: USAGE_TIMEOUT_MS,
+    }),
+
+  getUsageRankings: (range: UsageTimeRange = 'all') =>
+    apiClient.get<UsageRankingsPayload>('/usage/rankings', {
+      timeout: USAGE_TIMEOUT_MS,
+      params: { range },
     }),
 
   getUsageTokenBreakdown: (

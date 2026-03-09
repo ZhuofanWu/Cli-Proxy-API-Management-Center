@@ -31,6 +31,7 @@ import {
   useUsageData,
   useUsageGeneralData,
   useUsageHealthData,
+  useUsageRankingsData,
   useUsageCostTrendData,
   useUsageTokenBreakdownData,
   useUsageGeneralSparklines,
@@ -175,6 +176,15 @@ export function UsagePage() {
   } = useUsageHealthData(isSqliteUsage);
 
   const {
+    apiStats: sqliteApiStats,
+    modelStats: sqliteModelStats,
+    loading: rankingsLoading,
+    error: rankingsError,
+    lastRefreshedAt: rankingsLastRefreshedAt,
+    loadUsageRankings,
+  } = useUsageRankingsData(timeRange, isSqliteUsage);
+
+  const {
     tokenBreakdown,
     loading: tokenBreakdownLoading,
     error: tokenBreakdownError,
@@ -206,6 +216,7 @@ export function UsagePage() {
         loadUsage(),
         loadUsageGeneral(),
         loadUsageHealth(),
+        loadUsageRankings(),
         loadUsageTokenBreakdown(),
         loadUsageCostTrend(),
       ]);
@@ -217,6 +228,7 @@ export function UsagePage() {
     loadUsage,
     loadUsageGeneral,
     loadUsageHealth,
+    loadUsageRankings,
     loadUsageTokenBreakdown,
     loadUsageCostTrend,
   ]);
@@ -295,6 +307,7 @@ export function UsagePage() {
 
   const effectiveLastRefreshedAt = isSqliteUsage
     ? (generalLastRefreshedAt ??
+      rankingsLastRefreshedAt ??
       healthLastRefreshedAt ??
       tokenBreakdownLastRefreshedAt ??
       costTrendLastRefreshedAt ??
@@ -331,7 +344,14 @@ export function UsagePage() {
       };
 
   const statCardsLoading = isSqliteUsage ? generalLoading : loading;
-  const pageError = [error, generalError, healthError, tokenBreakdownError, costTrendError]
+  const pageError = [
+    error,
+    generalError,
+    healthError,
+    rankingsError,
+    tokenBreakdownError,
+    costTrendError,
+  ]
     .filter(Boolean)
     .join('；');
   const serviceHealthLoading = isSqliteUsage ? healthLoading : loading;
@@ -342,6 +362,7 @@ export function UsagePage() {
     tokenBreakdownPagingEnabled && Boolean(tokenBreakdown?.has_older);
   const canPageToNewerTokenBreakdown = tokenBreakdownPagingEnabled && tokenBreakdownOffset > 0;
   const costTrendCardLoading = isSqliteUsage && hasPrices ? costTrendLoading : loading;
+  const detailsCardLoading = isSqliteUsage ? rankingsLoading : loading;
   const costTrendPagingEnabled = isSqliteUsage && costTrendPeriod === 'day' && timeRange === 'all';
   const canPageToOlderCostTrend = costTrendPagingEnabled && Boolean(costTrend?.has_older);
   const canPageToNewerCostTrend = costTrendPagingEnabled && costTrendOffset > 0;
@@ -357,6 +378,7 @@ export function UsagePage() {
         await Promise.all([
           loadUsageGeneral().catch(() => {}),
           loadUsageHealth().catch(() => {}),
+          loadUsageRankings().catch(() => {}),
           loadUsageTokenBreakdown().catch(() => {}),
           loadUsageCostTrend().catch(() => {}),
         ]);
@@ -367,6 +389,7 @@ export function UsagePage() {
       isSqliteUsage,
       loadUsageGeneral,
       loadUsageHealth,
+      loadUsageRankings,
       loadUsageTokenBreakdown,
       loadUsageCostTrend,
     ]
@@ -414,8 +437,10 @@ export function UsagePage() {
 
   // Derived data
   const modelNames = useMemo(() => getModelNamesFromUsage(usage), [usage]);
-  const apiStats = useMemo(() => getApiStats(usage, modelPrices), [usage, modelPrices]);
-  const modelStats = useMemo(() => getModelStats(usage, modelPrices), [usage, modelPrices]);
+  const memoryApiStats = useMemo(() => getApiStats(usage, modelPrices), [usage, modelPrices]);
+  const memoryModelStats = useMemo(() => getModelStats(usage, modelPrices), [usage, modelPrices]);
+  const apiStats = isSqliteUsage ? sqliteApiStats : memoryApiStats;
+  const modelStats = isSqliteUsage ? sqliteModelStats : memoryModelStats;
 
   return (
     <div className={styles.container}>
@@ -468,13 +493,19 @@ export function UsagePage() {
               loading ||
               generalLoading ||
               healthLoading ||
+              rankingsLoading ||
               tokenBreakdownLoading ||
               costTrendLoading ||
               exporting ||
               importing
             }
           >
-            {loading || generalLoading || healthLoading || tokenBreakdownLoading || costTrendLoading
+            {loading ||
+            generalLoading ||
+            healthLoading ||
+            rankingsLoading ||
+            tokenBreakdownLoading ||
+            costTrendLoading
               ? t('common.loading')
               : t('usage_stats.refresh')}
           </Button>
@@ -583,8 +614,12 @@ export function UsagePage() {
 
       {/* Details Grid */}
       <div className={styles.detailsGrid}>
-        <ApiDetailsCard apiStats={apiStats} loading={loading} hasPrices={hasPrices} />
-        <ModelStatsCard modelStats={modelStats} loading={loading} hasPrices={hasPrices} />
+        <ApiDetailsCard apiStats={apiStats} loading={detailsCardLoading} hasPrices={hasPrices} />
+        <ModelStatsCard
+          modelStats={modelStats}
+          loading={detailsCardLoading}
+          hasPrices={hasPrices}
+        />
       </div>
 
       <RequestEventsDetailsCard

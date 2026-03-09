@@ -8,6 +8,9 @@ export type { UseUsageGeneralDataReturn } from './hooks/useUsageGeneralData';
 export { useUsageHealthData } from './hooks/useUsageHealthData';
 export type { UseUsageHealthDataReturn } from './hooks/useUsageHealthData';
 
+export { useUsageRankingsData } from './hooks/useUsageRankingsData';
+export type { UseUsageRankingsDataReturn } from './hooks/useUsageRankingsData';
+
 export { useUsageTokenBreakdownData } from './hooks/useUsageTokenBreakdownData';
 export type { UseUsageTokenBreakdownDataReturn } from './hooks/useUsageTokenBreakdownData';
 
