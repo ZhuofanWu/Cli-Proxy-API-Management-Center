@@ -69,6 +69,24 @@ export interface UsageHealthPayload {
   total_failure?: number;
 }
 
+export type UsageTokenBreakdownGranularity = 'hour' | 'day';
+
+export interface UsageTokenBreakdownBucket {
+  label?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  cached_tokens?: number;
+  reasoning_tokens?: number;
+}
+
+export interface UsageTokenBreakdownPayload {
+  granularity?: UsageTokenBreakdownGranularity;
+  range?: UsageTimeRange;
+  offset?: number;
+  has_older?: boolean;
+  buckets?: UsageTokenBreakdownBucket[];
+}
+
 export const usageApi = {
   /**
    * 获取使用统计原始数据
@@ -88,6 +106,16 @@ export const usageApi = {
   getUsageHealth: () =>
     apiClient.get<UsageHealthPayload>('/usage/health', {
       timeout: USAGE_TIMEOUT_MS,
+    }),
+
+  getUsageTokenBreakdown: (
+    granularity: UsageTokenBreakdownGranularity,
+    range: UsageTimeRange = 'all',
+    offset = 0
+  ) =>
+    apiClient.get<UsageTokenBreakdownPayload>('/usage/token-breakdown', {
+      timeout: USAGE_TIMEOUT_MS,
+      params: { granularity, range, offset },
     }),
 
   getFullUsage: () =>

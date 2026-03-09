@@ -8,8 +8,16 @@ export type { UseUsageGeneralDataReturn } from './hooks/useUsageGeneralData';
 export { useUsageHealthData } from './hooks/useUsageHealthData';
 export type { UseUsageHealthDataReturn } from './hooks/useUsageHealthData';
 
+export { useUsageTokenBreakdownData } from './hooks/useUsageTokenBreakdownData';
+export type { UseUsageTokenBreakdownDataReturn } from './hooks/useUsageTokenBreakdownData';
+
 export { useSparklines } from './hooks/useSparklines';
-export type { SparklineData, SparklineBundle, UseSparklinesOptions, UseSparklinesReturn } from './hooks/useSparklines';
+export type {
+  SparklineData,
+  SparklineBundle,
+  UseSparklinesOptions,
+  UseSparklinesReturn,
+} from './hooks/useSparklines';
 
 export { useUsageGeneralSparklines } from './hooks/useUsageGeneralSparklines';
 

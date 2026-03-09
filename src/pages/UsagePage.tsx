@@ -31,6 +31,7 @@ import {
   useUsageData,
   useUsageGeneralData,
   useUsageHealthData,
+  useUsageTokenBreakdownData,
   useUsageGeneralSparklines,
   useSparklines,
   useChartData,
@@ -42,6 +43,7 @@ import {
   type ModelPrice,
   type UsageTimeRange,
 } from '@/utils/usage';
+import { type UsageTokenBreakdownGranularity } from '@/services/api/usage';
 import styles from './UsagePage.module.scss';
 
 // Register Chart.js components
@@ -61,6 +63,7 @@ const TIME_RANGE_STORAGE_KEY = 'cli-proxy-usage-time-range-v1';
 const DEFAULT_CHART_LINES = ['all'];
 const DEFAULT_TIME_RANGE: UsageTimeRange = '24h';
 const MAX_CHART_LINES = 9;
+const TOKEN_BREAKDOWN_PAGE_DAYS = 15;
 const TIME_RANGE_OPTIONS: ReadonlyArray<{ value: UsageTimeRange; labelKey: string }> = [
   { value: 'all', labelKey: 'usage_stats.range_all' },
   { value: '7h', labelKey: 'usage_stats.range_7h' },
@@ -129,6 +132,9 @@ export function UsagePage() {
 
   const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
   const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
+  const [tokenBreakdownPeriod, setTokenBreakdownPeriod] =
+    useState<UsageTokenBreakdownGranularity>('hour');
+  const [tokenBreakdownOffset, setTokenBreakdownOffset] = useState(0);
 
   // Data hook
   const {
@@ -161,13 +167,31 @@ export function UsagePage() {
     loadUsageHealth,
   } = useUsageHealthData(isSqliteUsage);
 
+  const {
+    tokenBreakdown,
+    loading: tokenBreakdownLoading,
+    error: tokenBreakdownError,
+    lastRefreshedAt: tokenBreakdownLastRefreshedAt,
+    loadUsageTokenBreakdown,
+  } = useUsageTokenBreakdownData(
+    tokenBreakdownPeriod,
+    timeRange,
+    tokenBreakdownOffset,
+    isSqliteUsage
+  );
+
   const loadPageData = useCallback(async () => {
     if (isSqliteUsage) {
-      await Promise.all([loadUsage(), loadUsageGeneral(), loadUsageHealth()]);
+      await Promise.all([
+        loadUsage(),
+        loadUsageGeneral(),
+        loadUsageHealth(),
+        loadUsageTokenBreakdown(),
+      ]);
       return;
     }
     await loadUsage();
-  }, [isSqliteUsage, loadUsage, loadUsageGeneral, loadUsageHealth]);
+  }, [isSqliteUsage, loadUsage, loadUsageGeneral, loadUsageHealth, loadUsageTokenBreakdown]);
 
   useHeaderRefresh(loadPageData);
 
@@ -185,6 +209,26 @@ export function UsagePage() {
   const handleChartLinesChange = useCallback((lines: string[]) => {
     setChartLines(normalizeChartLines(lines));
   }, []);
+
+  const handleTimeRangeChange = useCallback(
+    (value: UsageTimeRange) => {
+      setTimeRange(value);
+      if (value !== 'all' || tokenBreakdownPeriod !== 'day') {
+        setTokenBreakdownOffset(0);
+      }
+    },
+    [tokenBreakdownPeriod]
+  );
+
+  const handleTokenBreakdownPeriodChange = useCallback(
+    (value: UsageTokenBreakdownGranularity) => {
+      setTokenBreakdownPeriod(value);
+      if (value !== 'day' || timeRange !== 'all') {
+        setTokenBreakdownOffset(0);
+      }
+    },
+    [timeRange]
+  );
 
   useEffect(() => {
     try {
@@ -209,7 +253,10 @@ export function UsagePage() {
   }, [timeRange]);
 
   const effectiveLastRefreshedAt = isSqliteUsage
-    ? generalLastRefreshedAt ?? healthLastRefreshedAt ?? lastRefreshedAt
+    ? (generalLastRefreshedAt ??
+      healthLastRefreshedAt ??
+      tokenBreakdownLastRefreshedAt ??
+      lastRefreshedAt)
     : lastRefreshedAt;
   const nowMs = effectiveLastRefreshedAt?.getTime() ?? 0;
 
@@ -242,8 +289,16 @@ export function UsagePage() {
       };
 
   const statCardsLoading = isSqliteUsage ? generalLoading : loading;
-  const pageError = [error, generalError, healthError].filter(Boolean).join('；');
+  const pageError = [error, generalError, healthError, tokenBreakdownError]
+    .filter(Boolean)
+    .join('；');
   const serviceHealthLoading = isSqliteUsage ? healthLoading : loading;
+  const tokenBreakdownCardLoading = isSqliteUsage ? tokenBreakdownLoading : loading;
+  const tokenBreakdownPagingEnabled =
+    isSqliteUsage && tokenBreakdownPeriod === 'day' && timeRange === 'all';
+  const canPageToOlderTokenBreakdown =
+    tokenBreakdownPagingEnabled && Boolean(tokenBreakdown?.has_older);
+  const canPageToNewerTokenBreakdown = tokenBreakdownPagingEnabled && tokenBreakdownOffset > 0;
 
   const handleRefresh = useCallback(() => {
     void loadPageData().catch(() => {});
@@ -253,11 +308,35 @@ export function UsagePage() {
     async (event: ChangeEvent<HTMLInputElement>) => {
       await baseHandleImportChange(event);
       if (isSqliteUsage) {
-        await Promise.all([loadUsageGeneral().catch(() => {}), loadUsageHealth().catch(() => {})]);
+        await Promise.all([
+          loadUsageGeneral().catch(() => {}),
+          loadUsageHealth().catch(() => {}),
+          loadUsageTokenBreakdown().catch(() => {}),
+        ]);
       }
     },
-    [baseHandleImportChange, isSqliteUsage, loadUsageGeneral, loadUsageHealth]
+    [
+      baseHandleImportChange,
+      isSqliteUsage,
+      loadUsageGeneral,
+      loadUsageHealth,
+      loadUsageTokenBreakdown,
+    ]
   );
+
+  const handleTokenBreakdownPageToOlder = useCallback(() => {
+    if (!canPageToOlderTokenBreakdown) {
+      return;
+    }
+    setTokenBreakdownOffset((prev) => prev + TOKEN_BREAKDOWN_PAGE_DAYS);
+  }, [canPageToOlderTokenBreakdown]);
+
+  const handleTokenBreakdownPageToNewer = useCallback(() => {
+    if (!canPageToNewerTokenBreakdown) {
+      return;
+    }
+    setTokenBreakdownOffset((prev) => Math.max(prev - TOKEN_BREAKDOWN_PAGE_DAYS, 0));
+  }, [canPageToNewerTokenBreakdown]);
 
   // Chart data hook
   const {
@@ -297,7 +376,7 @@ export function UsagePage() {
             <Select
               value={timeRange}
               options={timeRangeOptions}
-              onChange={(value) => setTimeRange(value as UsageTimeRange)}
+              onChange={(value) => handleTimeRangeChange(value as UsageTimeRange)}
               className={styles.timeRangeSelectControl}
               ariaLabel={t('usage_stats.range_filter')}
               fullWidth={false}
@@ -325,9 +404,18 @@ export function UsagePage() {
             variant="secondary"
             size="sm"
             onClick={handleRefresh}
-            disabled={(loading || generalLoading || healthLoading) || exporting || importing}
+            disabled={
+              loading ||
+              generalLoading ||
+              healthLoading ||
+              tokenBreakdownLoading ||
+              exporting ||
+              importing
+            }
           >
-            {loading || generalLoading || healthLoading ? t('common.loading') : t('usage_stats.refresh')}
+            {loading || generalLoading || healthLoading || tokenBreakdownLoading
+              ? t('common.loading')
+              : t('usage_stats.refresh')}
           </Button>
           <input
             ref={importInputRef}
@@ -367,7 +455,11 @@ export function UsagePage() {
       />
 
       {/* Service Health */}
-      <ServiceHealthCard usage={usage} health={isSqliteUsage ? health : null} loading={serviceHealthLoading} />
+      <ServiceHealthCard
+        usage={usage}
+        health={isSqliteUsage ? health : null}
+        loading={serviceHealthLoading}
+      />
 
       {/* Charts Grid */}
       <div className={styles.chartsGrid}>
@@ -396,10 +488,18 @@ export function UsagePage() {
       {/* Token Breakdown Chart */}
       <TokenBreakdownChart
         usage={usage}
-        loading={loading}
+        loading={tokenBreakdownCardLoading}
         isDark={isDark}
         isMobile={isMobile}
         hourWindowHours={hourWindowHours}
+        period={tokenBreakdownPeriod}
+        onPeriodChange={handleTokenBreakdownPeriodChange}
+        sqliteBreakdown={isSqliteUsage ? tokenBreakdown : null}
+        showPagination
+        canPageBackward={canPageToOlderTokenBreakdown}
+        canPageForward={canPageToNewerTokenBreakdown}
+        onPageBackward={handleTokenBreakdownPageToOlder}
+        onPageForward={handleTokenBreakdownPageToNewer}
       />
 
       {/* Cost Trend Chart */}
@@ -441,5 +541,3 @@ export function UsagePage() {
     </div>
   );
 }
-
-

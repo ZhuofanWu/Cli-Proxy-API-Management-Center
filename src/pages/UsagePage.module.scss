@@ -838,6 +838,26 @@
   gap: 6px;
 }
 
+.tokenBreakdownHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.tokenBreakdownPager {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tokenBreakdownPagerBracket {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .chartsGrid {
   display: grid;
   gap: 20px;
