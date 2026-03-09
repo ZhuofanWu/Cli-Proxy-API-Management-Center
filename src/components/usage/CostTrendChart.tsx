@@ -4,6 +4,7 @@ import type { ScriptableContext } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import {
   buildHourlyCostSeries,
   buildDailyCostSeries,
@@ -157,6 +158,8 @@ export function CostTrendChart({
     t,
   ]);
 
+  const hasChartData = hasData;
+
   return (
     <Card
       title={t('usage_stats.cost_trend')}
@@ -207,28 +210,51 @@ export function CostTrendChart({
         </div>
       }
     >
-      {loading ? (
-        <div className={styles.hint}>{t('common.loading')}</div>
-      ) : !hasPrices ? (
-        <div className={styles.hint}>{t('usage_stats.cost_need_price')}</div>
-      ) : !hasData ? (
-        <div className={styles.hint}>{t('usage_stats.cost_no_data')}</div>
-      ) : (
-        <div className={styles.chartWrapper}>
-          <div className={styles.chartArea}>
-            <div className={styles.chartScroller}>
-              <div
-                className={styles.chartCanvas}
-                style={
-                  period === 'hour'
-                    ? { minWidth: getHourChartMinWidth(chartData.labels.length, isMobile) }
-                    : undefined
-                }
-              >
-                <Line data={chartData} options={chartOptions} />
+      {hasChartData ? (
+        <div
+          className={styles.chartState}
+          aria-busy={loading}
+          aria-live={loading ? 'polite' : undefined}
+        >
+          <div className={styles.chartWrapper}>
+            <div className={styles.chartArea}>
+              <div className={styles.chartScroller}>
+                <div
+                  className={styles.chartCanvas}
+                  style={
+                    period === 'hour'
+                      ? { minWidth: getHourChartMinWidth(chartData.labels.length, isMobile) }
+                      : undefined
+                  }
+                >
+                  <Line data={chartData} options={chartOptions} />
+                </div>
               </div>
             </div>
           </div>
+          {loading && (
+            <div className={styles.chartStateOverlay}>
+              <div className={styles.chartStateOverlayContent}>
+                <LoadingSpinner size={20} />
+                <span>{t('common.loading')}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : loading ? (
+        <div className={styles.chartPlaceholder} aria-busy="true" aria-live="polite">
+          <div className={styles.chartPlaceholderBody}>
+            <LoadingSpinner size={20} />
+            <span>{t('common.loading')}</span>
+          </div>
+        </div>
+      ) : !hasPrices ? (
+        <div className={styles.chartPlaceholder}>
+          <div className={styles.chartPlaceholderBody}>{t('usage_stats.cost_need_price')}</div>
+        </div>
+      ) : (
+        <div className={styles.chartPlaceholder}>
+          <div className={styles.chartPlaceholderBody}>{t('usage_stats.cost_no_data')}</div>
         </div>
       )}
     </Card>

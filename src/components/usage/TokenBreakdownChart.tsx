@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Line } from 'react-chartjs-2';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import {
   buildHourlyTokenBreakdown,
   buildDailyTokenBreakdown,
@@ -151,6 +152,8 @@ export function TokenBreakdownChart({
     return { chartData: data, chartOptions: options };
   }, [hourWindowHours, isDark, isMobile, period, sqliteBreakdown, t, usage]);
 
+  const hasChartData = chartData.labels.length > 0;
+
   return (
     <Card
       title={t('usage_stats.token_breakdown')}
@@ -204,42 +207,63 @@ export function TokenBreakdownChart({
         </div>
       }
     >
-      {loading ? (
-        <div className={styles.hint}>{t('common.loading')}</div>
-      ) : chartData.labels.length > 0 ? (
-        <div className={styles.chartWrapper}>
-          <div className={styles.chartLegend} aria-label="Chart legend">
-            {chartData.datasets.map((dataset, index) => (
-              <div
-                key={`${dataset.label}-${index}`}
-                className={styles.legendItem}
-                title={dataset.label}
-              >
-                <span
-                  className={styles.legendDot}
-                  style={{ backgroundColor: dataset.borderColor }}
-                />
-                <span className={styles.legendLabel}>{dataset.label}</span>
-              </div>
-            ))}
-          </div>
-          <div className={styles.chartArea}>
-            <div className={styles.chartScroller}>
-              <div
-                className={styles.chartCanvas}
-                style={
-                  period === 'hour'
-                    ? { minWidth: getHourChartMinWidth(chartData.labels.length, isMobile) }
-                    : undefined
-                }
-              >
-                <Line data={chartData} options={chartOptions} />
+      {hasChartData ? (
+        <div
+          className={styles.chartState}
+          aria-busy={loading}
+          aria-live={loading ? 'polite' : undefined}
+        >
+          <div className={styles.chartWrapper}>
+            <div className={styles.chartLegend} aria-label="Chart legend">
+              {chartData.datasets.map((dataset, index) => (
+                <div
+                  key={`${dataset.label}-${index}`}
+                  className={styles.legendItem}
+                  title={dataset.label}
+                >
+                  <span
+                    className={styles.legendDot}
+                    style={{ backgroundColor: dataset.borderColor }}
+                  />
+                  <span className={styles.legendLabel}>{dataset.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className={styles.chartArea}>
+              <div className={styles.chartScroller}>
+                <div
+                  className={styles.chartCanvas}
+                  style={
+                    period === 'hour'
+                      ? { minWidth: getHourChartMinWidth(chartData.labels.length, isMobile) }
+                      : undefined
+                  }
+                >
+                  <Line data={chartData} options={chartOptions} />
+                </div>
               </div>
             </div>
           </div>
+          {loading && (
+            <div className={styles.chartStateOverlay}>
+              <div className={styles.chartStateOverlayContent}>
+                <LoadingSpinner size={20} />
+                <span>{t('common.loading')}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : loading ? (
+        <div className={styles.chartPlaceholder} aria-busy="true" aria-live="polite">
+          <div className={styles.chartPlaceholderBody}>
+            <LoadingSpinner size={20} />
+            <span>{t('common.loading')}</span>
+          </div>
         </div>
       ) : (
-        <div className={styles.hint}>{t('usage_stats.no_data')}</div>
+        <div className={styles.chartPlaceholder}>
+          <div className={styles.chartPlaceholderBody}>{t('usage_stats.no_data')}</div>
+        </div>
       )}
     </Card>
   );
