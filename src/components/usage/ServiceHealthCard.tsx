@@ -4,10 +4,149 @@ import {
   collectUsageDetails,
   calculateServiceHealthData,
   type ServiceHealthData,
+  type StatusBlockState,
   type StatusBlockDetail,
 } from '@/utils/usage';
 import type { UsagePayload } from './hooks/useUsageData';
+import type { UsageHealthPayload } from '@/services/api/usage';
 import styles from '@/pages/UsagePage.module.scss';
+
+const DEFAULT_ROWS = 7;
+const DEFAULT_COLS = 96;
+const DEFAULT_BUCKET_MINUTES = 15;
+
+function createEmptyHealthData(rows = DEFAULT_ROWS, cols = DEFAULT_COLS): ServiceHealthData {
+  const blockCount = rows * cols;
+  const bucketMs = DEFAULT_BUCKET_MINUTES * 60 * 1000;
+  const windowStart = Date.now() - blockCount * bucketMs;
+
+  const blocks: StatusBlockState[] = Array.from({ length: blockCount }, () => 'idle');
+  const blockDetails: StatusBlockDetail[] = Array.from({ length: blockCount }, (_, index) => {
+    const startTime = windowStart + index * bucketMs;
+    return {
+      success: 0,
+      failure: 0,
+      rate: -1,
+      startTime,
+      endTime: startTime + bucketMs,
+    };
+  });
+
+  return {
+    blocks,
+    blockDetails,
+    successRate: 100,
+    totalSuccess: 0,
+    totalFailure: 0,
+    rows,
+    cols,
+  };
+}
+
+function normalizeCount(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.round(value));
+}
+
+function normalizeRate(value: unknown, success: number, failure: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(-1, Math.min(100, Math.round(value)));
+  }
+  const total = success + failure;
+  if (total <= 0) {
+    return -1;
+  }
+  return Math.round((success * 100) / total);
+}
+
+function buildServiceHealthDataFromBackend(health: UsageHealthPayload | null): ServiceHealthData {
+  const rows =
+    typeof health?.rows === 'number' && Number.isFinite(health.rows) && health.rows > 0
+      ? Math.round(health.rows)
+      : DEFAULT_ROWS;
+  const cols =
+    typeof health?.cols === 'number' && Number.isFinite(health.cols) && health.cols > 0
+      ? Math.round(health.cols)
+      : DEFAULT_COLS;
+  const blockCount = rows * cols;
+  const bucketMinutes =
+    typeof health?.bucket_minutes === 'number' &&
+    Number.isFinite(health.bucket_minutes) &&
+    health.bucket_minutes > 0
+      ? Math.round(health.bucket_minutes)
+      : DEFAULT_BUCKET_MINUTES;
+  const bucketMs = bucketMinutes * 60 * 1000;
+
+  const parsedStart = Date.parse(health?.window_start ?? '');
+  const parsedEnd = Date.parse(health?.window_end ?? '');
+  const windowStart = Number.isFinite(parsedStart)
+    ? parsedStart
+    : Number.isFinite(parsedEnd)
+      ? parsedEnd - blockCount * bucketMs
+      : Date.now() - blockCount * bucketMs;
+
+  if (!health) {
+    return createEmptyHealthData(rows, cols);
+  }
+
+  const rates = Array.isArray(health.rates) ? health.rates : [];
+  const successCounts = Array.isArray(health.success_counts) ? health.success_counts : [];
+  const failureCounts = Array.isArray(health.failure_counts) ? health.failure_counts : [];
+
+  const blocks: StatusBlockState[] = [];
+  const blockDetails: StatusBlockDetail[] = [];
+  let totalSuccess = 0;
+  let totalFailure = 0;
+
+  for (let index = 0; index < blockCount; index += 1) {
+    const success = normalizeCount(successCounts[index]);
+    const failure = normalizeCount(failureCounts[index]);
+    const total = success + failure;
+    const ratePercent = normalizeRate(rates[index], success, failure);
+    const startTime = windowStart + index * bucketMs;
+
+    totalSuccess += success;
+    totalFailure += failure;
+
+    if (total === 0) {
+      blocks.push('idle');
+    } else if (failure === 0) {
+      blocks.push('success');
+    } else if (success === 0) {
+      blocks.push('failure');
+    } else {
+      blocks.push('mixed');
+    }
+
+    blockDetails.push({
+      success,
+      failure,
+      rate: total > 0 ? ratePercent / 100 : -1,
+      startTime,
+      endTime: startTime + bucketMs,
+    });
+  }
+
+  const totalRequests = totalSuccess + totalFailure;
+  const successRate =
+    totalRequests > 0
+      ? (totalSuccess / totalRequests) * 100
+      : typeof health.success_rate === 'number' && Number.isFinite(health.success_rate)
+        ? health.success_rate
+        : 100;
+
+  return {
+    blocks,
+    blockDetails,
+    successRate,
+    totalSuccess,
+    totalFailure,
+    rows,
+    cols,
+  };
+}
 
 const COLOR_STOPS = [
   { r: 239, g: 68, b: 68 },   // #ef4444
@@ -38,18 +177,22 @@ function formatDateTime(timestamp: number): string {
 
 export interface ServiceHealthCardProps {
   usage: UsagePayload | null;
+  health?: UsageHealthPayload | null;
   loading: boolean;
 }
 
-export function ServiceHealthCard({ usage, loading }: ServiceHealthCardProps) {
+export function ServiceHealthCard({ usage, health = null, loading }: ServiceHealthCardProps) {
   const { t } = useTranslation();
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   const healthData: ServiceHealthData = useMemo(() => {
+    if (health) {
+      return buildServiceHealthDataFromBackend(health);
+    }
     const details = usage ? collectUsageDetails(usage) : [];
     return calculateServiceHealthData(details);
-  }, [usage]);
+  }, [health, usage]);
 
   const hasData = healthData.totalSuccess + healthData.totalFailure > 0;
 

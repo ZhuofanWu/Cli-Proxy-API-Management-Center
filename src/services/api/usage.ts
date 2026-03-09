@@ -55,6 +55,20 @@ export interface UsageGeneralPayload {
   series?: UsageGeneralSeries;
 }
 
+export interface UsageHealthPayload {
+  rates?: number[];
+  success_counts?: number[];
+  failure_counts?: number[];
+  window_start?: string;
+  window_end?: string;
+  bucket_minutes?: number;
+  rows?: number;
+  cols?: number;
+  success_rate?: number;
+  total_success?: number;
+  total_failure?: number;
+}
+
 export const usageApi = {
   /**
    * 获取使用统计原始数据
@@ -69,6 +83,11 @@ export const usageApi = {
     apiClient.get<UsageGeneralPayload>('/usage/general', {
       timeout: USAGE_TIMEOUT_MS,
       params: { range },
+    }),
+
+  getUsageHealth: () =>
+    apiClient.get<UsageHealthPayload>('/usage/health', {
+      timeout: USAGE_TIMEOUT_MS,
     }),
 
   getFullUsage: () =>

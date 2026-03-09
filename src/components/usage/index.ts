@@ -5,6 +5,9 @@ export type { UsagePayload, UseUsageDataReturn } from './hooks/useUsageData';
 export { useUsageGeneralData } from './hooks/useUsageGeneralData';
 export type { UseUsageGeneralDataReturn } from './hooks/useUsageGeneralData';
 
+export { useUsageHealthData } from './hooks/useUsageHealthData';
+export type { UseUsageHealthDataReturn } from './hooks/useUsageHealthData';
+
 export { useSparklines } from './hooks/useSparklines';
 export type { SparklineData, SparklineBundle, UseSparklinesOptions, UseSparklinesReturn } from './hooks/useSparklines';
 

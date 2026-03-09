@@ -30,6 +30,7 @@ import {
   ServiceHealthCard,
   useUsageData,
   useUsageGeneralData,
+  useUsageHealthData,
   useUsageGeneralSparklines,
   useSparklines,
   useChartData,
@@ -152,13 +153,21 @@ export function UsagePage() {
     loadUsageGeneral,
   } = useUsageGeneralData(timeRange, isSqliteUsage);
 
+  const {
+    health,
+    loading: healthLoading,
+    error: healthError,
+    lastRefreshedAt: healthLastRefreshedAt,
+    loadUsageHealth,
+  } = useUsageHealthData(isSqliteUsage);
+
   const loadPageData = useCallback(async () => {
     if (isSqliteUsage) {
-      await Promise.all([loadUsage(), loadUsageGeneral()]);
+      await Promise.all([loadUsage(), loadUsageGeneral(), loadUsageHealth()]);
       return;
     }
     await loadUsage();
-  }, [isSqliteUsage, loadUsage, loadUsageGeneral]);
+  }, [isSqliteUsage, loadUsage, loadUsageGeneral, loadUsageHealth]);
 
   useHeaderRefresh(loadPageData);
 
@@ -199,7 +208,9 @@ export function UsagePage() {
     }
   }, [timeRange]);
 
-  const effectiveLastRefreshedAt = isSqliteUsage ? generalLastRefreshedAt ?? lastRefreshedAt : lastRefreshedAt;
+  const effectiveLastRefreshedAt = isSqliteUsage
+    ? generalLastRefreshedAt ?? healthLastRefreshedAt ?? lastRefreshedAt
+    : lastRefreshedAt;
   const nowMs = effectiveLastRefreshedAt?.getTime() ?? 0;
 
   // Sparklines hook
@@ -231,7 +242,8 @@ export function UsagePage() {
       };
 
   const statCardsLoading = isSqliteUsage ? generalLoading : loading;
-  const pageError = [error, generalError].filter(Boolean).join('；');
+  const pageError = [error, generalError, healthError].filter(Boolean).join('；');
+  const serviceHealthLoading = isSqliteUsage ? healthLoading : loading;
 
   const handleRefresh = useCallback(() => {
     void loadPageData().catch(() => {});
@@ -241,10 +253,10 @@ export function UsagePage() {
     async (event: ChangeEvent<HTMLInputElement>) => {
       await baseHandleImportChange(event);
       if (isSqliteUsage) {
-        await loadUsageGeneral().catch(() => {});
+        await Promise.all([loadUsageGeneral().catch(() => {}), loadUsageHealth().catch(() => {})]);
       }
     },
-    [baseHandleImportChange, isSqliteUsage, loadUsageGeneral]
+    [baseHandleImportChange, isSqliteUsage, loadUsageGeneral, loadUsageHealth]
   );
 
   // Chart data hook
@@ -313,9 +325,9 @@ export function UsagePage() {
             variant="secondary"
             size="sm"
             onClick={handleRefresh}
-            disabled={(loading || generalLoading) || exporting || importing}
+            disabled={(loading || generalLoading || healthLoading) || exporting || importing}
           >
-            {loading || generalLoading ? t('common.loading') : t('usage_stats.refresh')}
+            {loading || generalLoading || healthLoading ? t('common.loading') : t('usage_stats.refresh')}
           </Button>
           <input
             ref={importInputRef}
@@ -355,7 +367,7 @@ export function UsagePage() {
       />
 
       {/* Service Health */}
-      <ServiceHealthCard usage={usage} loading={loading} />
+      <ServiceHealthCard usage={usage} health={isSqliteUsage ? health : null} loading={serviceHealthLoading} />
 
       {/* Charts Grid */}
       <div className={styles.chartsGrid}>
