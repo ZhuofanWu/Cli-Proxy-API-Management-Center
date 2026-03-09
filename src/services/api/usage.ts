@@ -69,7 +69,9 @@ export interface UsageHealthPayload {
   total_failure?: number;
 }
 
-export type UsageTokenBreakdownGranularity = 'hour' | 'day';
+export type UsageChartGranularity = 'hour' | 'day';
+export type UsageTokenBreakdownGranularity = UsageChartGranularity;
+export type UsageCostTrendGranularity = UsageChartGranularity;
 
 export interface UsageTokenBreakdownBucket {
   label?: string;
@@ -85,6 +87,19 @@ export interface UsageTokenBreakdownPayload {
   offset?: number;
   has_older?: boolean;
   buckets?: UsageTokenBreakdownBucket[];
+}
+
+export interface UsageCostTrendBucket {
+  label?: string;
+  cost?: number;
+}
+
+export interface UsageCostTrendPayload {
+  granularity?: UsageCostTrendGranularity;
+  range?: UsageTimeRange;
+  offset?: number;
+  has_older?: boolean;
+  buckets?: UsageCostTrendBucket[];
 }
 
 export const usageApi = {
@@ -114,6 +129,16 @@ export const usageApi = {
     offset = 0
   ) =>
     apiClient.get<UsageTokenBreakdownPayload>('/usage/token-breakdown', {
+      timeout: USAGE_TIMEOUT_MS,
+      params: { granularity, range, offset },
+    }),
+
+  getUsageCostTrend: (
+    granularity: UsageCostTrendGranularity,
+    range: UsageTimeRange = 'all',
+    offset = 0
+  ) =>
+    apiClient.get<UsageCostTrendPayload>('/usage/cost-trend', {
       timeout: USAGE_TIMEOUT_MS,
       params: { granularity, range, offset },
     }),

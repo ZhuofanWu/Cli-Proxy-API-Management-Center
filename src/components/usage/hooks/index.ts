@@ -15,5 +15,8 @@ export type { UseUsageHealthDataReturn } from './useUsageHealthData';
 export { useUsageTokenBreakdownData } from './useUsageTokenBreakdownData';
 export type { UseUsageTokenBreakdownDataReturn } from './useUsageTokenBreakdownData';
 
+export { useUsageCostTrendData } from './useUsageCostTrendData';
+export type { UseUsageCostTrendDataReturn } from './useUsageCostTrendData';
+
 export { useChartData } from './useChartData';
 export type { UseChartDataOptions, UseChartDataReturn } from './useChartData';

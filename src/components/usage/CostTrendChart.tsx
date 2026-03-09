@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ScriptableContext } from 'chart.js';
 import { Line } from 'react-chartjs-2';
@@ -8,9 +8,10 @@ import {
   buildHourlyCostSeries,
   buildDailyCostSeries,
   formatUsd,
-  type ModelPrice
+  type ModelPrice,
 } from '@/utils/usage';
 import { buildChartOptions, getHourChartMinWidth } from '@/utils/usage/chartConfig';
+import { type UsageCostTrendPayload } from '@/services/api/usage';
 import type { UsagePayload } from './hooks/useUsageData';
 import styles from '@/pages/UsagePage.module.scss';
 
@@ -21,6 +22,14 @@ export interface CostTrendChartProps {
   isMobile: boolean;
   modelPrices: Record<string, ModelPrice>;
   hourWindowHours?: number;
+  period: 'hour' | 'day';
+  onPeriodChange: (period: 'hour' | 'day') => void;
+  sqliteCostTrend?: UsageCostTrendPayload | null;
+  showPagination?: boolean;
+  canPageBackward?: boolean;
+  canPageForward?: boolean;
+  onPageBackward?: () => void;
+  onPageForward?: () => void;
 }
 
 const COST_COLOR = '#f59e0b';
@@ -43,19 +52,43 @@ export function CostTrendChart({
   isDark,
   isMobile,
   modelPrices,
-  hourWindowHours
+  hourWindowHours,
+  period,
+  onPeriodChange,
+  sqliteCostTrend = null,
+  showPagination = false,
+  canPageBackward = false,
+  canPageForward = false,
+  onPageBackward,
+  onPageForward,
 }: CostTrendChartProps) {
   const { t } = useTranslation();
-  const [period, setPeriod] = useState<'hour' | 'day'>('hour');
   const hasPrices = Object.keys(modelPrices).length > 0;
 
   const { chartData, chartOptions, hasData } = useMemo(() => {
-    if (!hasPrices || !usage) {
+    if (!hasPrices || (!sqliteCostTrend && !usage)) {
       return { chartData: { labels: [], datasets: [] }, chartOptions: {}, hasData: false };
     }
 
-    const series =
-      period === 'hour'
+    const series = sqliteCostTrend
+      ? {
+          labels: Array.isArray(sqliteCostTrend.buckets)
+            ? sqliteCostTrend.buckets.map((bucket) =>
+                typeof bucket?.label === 'string' ? bucket.label : ''
+              )
+            : [],
+          data: Array.isArray(sqliteCostTrend.buckets)
+            ? sqliteCostTrend.buckets.map((bucket) =>
+                typeof bucket?.cost === 'number' ? bucket.cost : 0
+              )
+            : [],
+          hasData: Array.isArray(sqliteCostTrend.buckets)
+            ? sqliteCostTrend.buckets.some(
+                (bucket) => (typeof bucket?.cost === 'number' ? bucket.cost : 0) > 0
+              )
+            : false,
+        }
+      : period === 'hour'
         ? buildHourlyCostSeries(usage, modelPrices, hourWindowHours)
         : buildDailyCostSeries(usage, modelPrices);
 
@@ -70,9 +103,9 @@ export function CostTrendChart({
           pointBackgroundColor: COST_COLOR,
           pointBorderColor: COST_COLOR,
           fill: true,
-          tension: 0.35
-        }
-      ]
+          tension: 0.35,
+        },
+      ],
     };
 
     const baseOptions = buildChartOptions({ period, labels: series.labels, isDark, isMobile });
@@ -83,35 +116,77 @@ export function CostTrendChart({
         y: {
           ...baseOptions.scales?.y,
           ticks: {
-            ...(baseOptions.scales?.y && 'ticks' in baseOptions.scales.y ? baseOptions.scales.y.ticks : {}),
-            callback: (value: string | number) => formatUsd(Number(value))
-          }
-        }
-      }
+            ...(baseOptions.scales?.y && 'ticks' in baseOptions.scales.y
+              ? baseOptions.scales.y.ticks
+              : {}),
+            callback: (value: string | number) => formatUsd(Number(value)),
+          },
+        },
+      },
     };
 
     return { chartData: data, chartOptions: options, hasData: series.hasData };
-  }, [usage, period, isDark, isMobile, modelPrices, hasPrices, hourWindowHours, t]);
+  }, [
+    usage,
+    sqliteCostTrend,
+    period,
+    isDark,
+    isMobile,
+    modelPrices,
+    hasPrices,
+    hourWindowHours,
+    t,
+  ]);
 
   return (
     <Card
       title={t('usage_stats.cost_trend')}
       extra={
-        <div className={styles.periodButtons}>
-          <Button
-            variant={period === 'hour' ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => setPeriod('hour')}
-          >
-            {t('usage_stats.by_hour')}
-          </Button>
-          <Button
-            variant={period === 'day' ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => setPeriod('day')}
-          >
-            {t('usage_stats.by_day')}
-          </Button>
+        <div className={styles.tokenBreakdownHeaderActions}>
+          {showPagination && (
+            <div className={styles.tokenBreakdownPager} aria-label={t('usage_stats.cost_trend')}>
+              <span className={styles.tokenBreakdownPagerBracket} aria-hidden="true">
+                [
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onPageBackward}
+                disabled={!canPageBackward}
+                aria-label={t('auth_files.pagination_prev')}
+              >
+                {'<'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onPageForward}
+                disabled={!canPageForward}
+                aria-label={t('auth_files.pagination_next')}
+              >
+                {'>'}
+              </Button>
+              <span className={styles.tokenBreakdownPagerBracket} aria-hidden="true">
+                ]
+              </span>
+            </div>
+          )}
+          <div className={styles.periodButtons}>
+            <Button
+              variant={period === 'hour' ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => onPeriodChange('hour')}
+            >
+              {t('usage_stats.by_hour')}
+            </Button>
+            <Button
+              variant={period === 'day' ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => onPeriodChange('day')}
+            >
+              {t('usage_stats.by_day')}
+            </Button>
+          </div>
         </div>
       }
     >

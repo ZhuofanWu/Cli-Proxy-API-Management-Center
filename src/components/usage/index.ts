@@ -11,6 +11,9 @@ export type { UseUsageHealthDataReturn } from './hooks/useUsageHealthData';
 export { useUsageTokenBreakdownData } from './hooks/useUsageTokenBreakdownData';
 export type { UseUsageTokenBreakdownDataReturn } from './hooks/useUsageTokenBreakdownData';
 
+export { useUsageCostTrendData } from './hooks/useUsageCostTrendData';
+export type { UseUsageCostTrendDataReturn } from './hooks/useUsageCostTrendData';
+
 export { useSparklines } from './hooks/useSparklines';
 export type {
   SparklineData,

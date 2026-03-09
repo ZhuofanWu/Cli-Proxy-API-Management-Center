@@ -31,6 +31,7 @@ import {
   useUsageData,
   useUsageGeneralData,
   useUsageHealthData,
+  useUsageCostTrendData,
   useUsageTokenBreakdownData,
   useUsageGeneralSparklines,
   useSparklines,
@@ -43,7 +44,10 @@ import {
   type ModelPrice,
   type UsageTimeRange,
 } from '@/utils/usage';
-import { type UsageTokenBreakdownGranularity } from '@/services/api/usage';
+import {
+  type UsageCostTrendGranularity,
+  type UsageTokenBreakdownGranularity,
+} from '@/services/api/usage';
 import styles from './UsagePage.module.scss';
 
 // Register Chart.js components
@@ -128,6 +132,7 @@ export function UsagePage() {
   const isDark = resolvedTheme === 'dark';
   const config = useConfigStore((state) => state.config);
   const modelPrices = config?.modelPrices ?? EMPTY_MODEL_PRICES;
+  const hasPrices = Object.keys(modelPrices).length > 0;
   const isSqliteUsage = config?.usageStatisticsStorageWay === 'sqlite';
 
   const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
@@ -135,6 +140,8 @@ export function UsagePage() {
   const [tokenBreakdownPeriod, setTokenBreakdownPeriod] =
     useState<UsageTokenBreakdownGranularity>('hour');
   const [tokenBreakdownOffset, setTokenBreakdownOffset] = useState(0);
+  const [costTrendPeriod, setCostTrendPeriod] = useState<UsageCostTrendGranularity>('hour');
+  const [costTrendOffset, setCostTrendOffset] = useState(0);
 
   // Data hook
   const {
@@ -180,6 +187,19 @@ export function UsagePage() {
     isSqliteUsage
   );
 
+  const {
+    costTrend,
+    loading: costTrendLoading,
+    error: costTrendError,
+    lastRefreshedAt: costTrendLastRefreshedAt,
+    loadUsageCostTrend,
+  } = useUsageCostTrendData(
+    costTrendPeriod,
+    timeRange,
+    costTrendOffset,
+    isSqliteUsage && hasPrices
+  );
+
   const loadPageData = useCallback(async () => {
     if (isSqliteUsage) {
       await Promise.all([
@@ -187,11 +207,19 @@ export function UsagePage() {
         loadUsageGeneral(),
         loadUsageHealth(),
         loadUsageTokenBreakdown(),
+        loadUsageCostTrend(),
       ]);
       return;
     }
     await loadUsage();
-  }, [isSqliteUsage, loadUsage, loadUsageGeneral, loadUsageHealth, loadUsageTokenBreakdown]);
+  }, [
+    isSqliteUsage,
+    loadUsage,
+    loadUsageGeneral,
+    loadUsageHealth,
+    loadUsageTokenBreakdown,
+    loadUsageCostTrend,
+  ]);
 
   useHeaderRefresh(loadPageData);
 
@@ -216,8 +244,11 @@ export function UsagePage() {
       if (value !== 'all' || tokenBreakdownPeriod !== 'day') {
         setTokenBreakdownOffset(0);
       }
+      if (value !== 'all' || costTrendPeriod !== 'day') {
+        setCostTrendOffset(0);
+      }
     },
-    [tokenBreakdownPeriod]
+    [costTrendPeriod, tokenBreakdownPeriod]
   );
 
   const handleTokenBreakdownPeriodChange = useCallback(
@@ -225,6 +256,16 @@ export function UsagePage() {
       setTokenBreakdownPeriod(value);
       if (value !== 'day' || timeRange !== 'all') {
         setTokenBreakdownOffset(0);
+      }
+    },
+    [timeRange]
+  );
+
+  const handleCostTrendPeriodChange = useCallback(
+    (value: UsageCostTrendGranularity) => {
+      setCostTrendPeriod(value);
+      if (value !== 'day' || timeRange !== 'all') {
+        setCostTrendOffset(0);
       }
     },
     [timeRange]
@@ -256,6 +297,7 @@ export function UsagePage() {
     ? (generalLastRefreshedAt ??
       healthLastRefreshedAt ??
       tokenBreakdownLastRefreshedAt ??
+      costTrendLastRefreshedAt ??
       lastRefreshedAt)
     : lastRefreshedAt;
   const nowMs = effectiveLastRefreshedAt?.getTime() ?? 0;
@@ -289,7 +331,7 @@ export function UsagePage() {
       };
 
   const statCardsLoading = isSqliteUsage ? generalLoading : loading;
-  const pageError = [error, generalError, healthError, tokenBreakdownError]
+  const pageError = [error, generalError, healthError, tokenBreakdownError, costTrendError]
     .filter(Boolean)
     .join('；');
   const serviceHealthLoading = isSqliteUsage ? healthLoading : loading;
@@ -299,6 +341,10 @@ export function UsagePage() {
   const canPageToOlderTokenBreakdown =
     tokenBreakdownPagingEnabled && Boolean(tokenBreakdown?.has_older);
   const canPageToNewerTokenBreakdown = tokenBreakdownPagingEnabled && tokenBreakdownOffset > 0;
+  const costTrendCardLoading = isSqliteUsage && hasPrices ? costTrendLoading : loading;
+  const costTrendPagingEnabled = isSqliteUsage && costTrendPeriod === 'day' && timeRange === 'all';
+  const canPageToOlderCostTrend = costTrendPagingEnabled && Boolean(costTrend?.has_older);
+  const canPageToNewerCostTrend = costTrendPagingEnabled && costTrendOffset > 0;
 
   const handleRefresh = useCallback(() => {
     void loadPageData().catch(() => {});
@@ -312,6 +358,7 @@ export function UsagePage() {
           loadUsageGeneral().catch(() => {}),
           loadUsageHealth().catch(() => {}),
           loadUsageTokenBreakdown().catch(() => {}),
+          loadUsageCostTrend().catch(() => {}),
         ]);
       }
     },
@@ -321,6 +368,7 @@ export function UsagePage() {
       loadUsageGeneral,
       loadUsageHealth,
       loadUsageTokenBreakdown,
+      loadUsageCostTrend,
     ]
   );
 
@@ -338,6 +386,20 @@ export function UsagePage() {
     setTokenBreakdownOffset((prev) => Math.max(prev - TOKEN_BREAKDOWN_PAGE_DAYS, 0));
   }, [canPageToNewerTokenBreakdown]);
 
+  const handleCostTrendPageToOlder = useCallback(() => {
+    if (!canPageToOlderCostTrend) {
+      return;
+    }
+    setCostTrendOffset((prev) => prev + TOKEN_BREAKDOWN_PAGE_DAYS);
+  }, [canPageToOlderCostTrend]);
+
+  const handleCostTrendPageToNewer = useCallback(() => {
+    if (!canPageToNewerCostTrend) {
+      return;
+    }
+    setCostTrendOffset((prev) => Math.max(prev - TOKEN_BREAKDOWN_PAGE_DAYS, 0));
+  }, [canPageToNewerCostTrend]);
+
   // Chart data hook
   const {
     requestsPeriod,
@@ -354,8 +416,6 @@ export function UsagePage() {
   const modelNames = useMemo(() => getModelNamesFromUsage(usage), [usage]);
   const apiStats = useMemo(() => getApiStats(usage, modelPrices), [usage, modelPrices]);
   const modelStats = useMemo(() => getModelStats(usage, modelPrices), [usage, modelPrices]);
-
-  const hasPrices = Object.keys(modelPrices).length > 0;
 
   return (
     <div className={styles.container}>
@@ -409,11 +469,12 @@ export function UsagePage() {
               generalLoading ||
               healthLoading ||
               tokenBreakdownLoading ||
+              costTrendLoading ||
               exporting ||
               importing
             }
           >
-            {loading || generalLoading || healthLoading || tokenBreakdownLoading
+            {loading || generalLoading || healthLoading || tokenBreakdownLoading || costTrendLoading
               ? t('common.loading')
               : t('usage_stats.refresh')}
           </Button>
@@ -505,11 +566,19 @@ export function UsagePage() {
       {/* Cost Trend Chart */}
       <CostTrendChart
         usage={usage}
-        loading={loading}
+        loading={costTrendCardLoading}
         isDark={isDark}
         isMobile={isMobile}
         modelPrices={modelPrices}
         hourWindowHours={hourWindowHours}
+        period={costTrendPeriod}
+        onPeriodChange={handleCostTrendPeriodChange}
+        sqliteCostTrend={isSqliteUsage ? costTrend : null}
+        showPagination
+        canPageBackward={canPageToOlderCostTrend}
+        canPageForward={canPageToNewerCostTrend}
+        onPageBackward={handleCostTrendPageToOlder}
+        onPageForward={handleCostTrendPageToNewer}
       />
 
       {/* Details Grid */}
