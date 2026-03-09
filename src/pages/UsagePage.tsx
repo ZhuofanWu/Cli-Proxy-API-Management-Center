@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+﻿import { useState, useMemo, useCallback, useEffect, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Chart as ChartJS,
@@ -29,6 +29,8 @@ import {
   CostTrendChart,
   ServiceHealthCard,
   useUsageData,
+  useUsageGeneralData,
+  useUsageGeneralSparklines,
   useSparklines,
   useChartData,
 } from '@/components/usage';
@@ -122,6 +124,7 @@ export function UsagePage() {
   const isDark = resolvedTheme === 'dark';
   const config = useConfigStore((state) => state.config);
   const modelPrices = config?.modelPrices ?? EMPTY_MODEL_PRICES;
+  const isSqliteUsage = config?.usageStatisticsStorageWay === 'sqlite';
 
   const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
   const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
@@ -135,13 +138,29 @@ export function UsagePage() {
     loadUsage,
     handleExport,
     handleImport,
-    handleImportChange,
+    handleImportChange: baseHandleImportChange,
     importInputRef,
     exporting,
     importing,
   } = useUsageData(timeRange);
 
-  useHeaderRefresh(loadUsage);
+  const {
+    general,
+    loading: generalLoading,
+    error: generalError,
+    lastRefreshedAt: generalLastRefreshedAt,
+    loadUsageGeneral,
+  } = useUsageGeneralData(timeRange, isSqliteUsage);
+
+  const loadPageData = useCallback(async () => {
+    if (isSqliteUsage) {
+      await Promise.all([loadUsage(), loadUsageGeneral()]);
+      return;
+    }
+    await loadUsage();
+  }, [isSqliteUsage, loadUsage, loadUsageGeneral]);
+
+  useHeaderRefresh(loadPageData);
 
   const timeRangeOptions = useMemo(
     () =>
@@ -180,11 +199,53 @@ export function UsagePage() {
     }
   }, [timeRange]);
 
-  const nowMs = lastRefreshedAt?.getTime() ?? 0;
+  const effectiveLastRefreshedAt = isSqliteUsage ? generalLastRefreshedAt ?? lastRefreshedAt : lastRefreshedAt;
+  const nowMs = effectiveLastRefreshedAt?.getTime() ?? 0;
 
   // Sparklines hook
   const { requestsSparkline, tokensSparkline, rpmSparkline, tpmSparkline, costSparkline } =
     useSparklines({ usage, loading, nowMs });
+
+  const {
+    requestsSparkline: generalRequestsSparkline,
+    tokensSparkline: generalTokensSparkline,
+    rpmSparkline: generalRpmSparkline,
+    tpmSparkline: generalTpmSparkline,
+    costSparkline: generalCostSparkline,
+  } = useUsageGeneralSparklines({ general, loading: generalLoading });
+
+  const statCardSparklines = isSqliteUsage
+    ? {
+        requests: generalRequestsSparkline,
+        tokens: generalTokensSparkline,
+        rpm: generalRpmSparkline,
+        tpm: generalTpmSparkline,
+        cost: generalCostSparkline,
+      }
+    : {
+        requests: requestsSparkline,
+        tokens: tokensSparkline,
+        rpm: rpmSparkline,
+        tpm: tpmSparkline,
+        cost: costSparkline,
+      };
+
+  const statCardsLoading = isSqliteUsage ? generalLoading : loading;
+  const pageError = [error, generalError].filter(Boolean).join('；');
+
+  const handleRefresh = useCallback(() => {
+    void loadPageData().catch(() => {});
+  }, [loadPageData]);
+
+  const handleImportChange = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      await baseHandleImportChange(event);
+      if (isSqliteUsage) {
+        await loadUsageGeneral().catch(() => {});
+      }
+    },
+    [baseHandleImportChange, isSqliteUsage, loadUsageGeneral]
+  );
 
   // Chart data hook
   const {
@@ -202,6 +263,7 @@ export function UsagePage() {
   const modelNames = useMemo(() => getModelNamesFromUsage(usage), [usage]);
   const apiStats = useMemo(() => getApiStats(usage, modelPrices), [usage, modelPrices]);
   const modelStats = useMemo(() => getModelStats(usage, modelPrices), [usage, modelPrices]);
+
   const hasPrices = Object.keys(modelPrices).length > 0;
 
   return (
@@ -250,41 +312,38 @@ export function UsagePage() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => void loadUsage().catch(() => {})}
-            disabled={loading || exporting || importing}
+            onClick={handleRefresh}
+            disabled={(loading || generalLoading) || exporting || importing}
           >
-            {loading ? t('common.loading') : t('usage_stats.refresh')}
+            {loading || generalLoading ? t('common.loading') : t('usage_stats.refresh')}
           </Button>
           <input
             ref={importInputRef}
             type="file"
             accept=".json,application/json"
             style={{ display: 'none' }}
-            onChange={handleImportChange}
+            onChange={(event) => {
+              void handleImportChange(event);
+            }}
           />
-          {lastRefreshedAt && (
+          {effectiveLastRefreshedAt && (
             <span className={styles.lastRefreshed}>
-              {t('usage_stats.last_updated')}: {lastRefreshedAt.toLocaleTimeString()}
+              {t('usage_stats.last_updated')}: {effectiveLastRefreshedAt.toLocaleTimeString()}
             </span>
           )}
         </div>
       </div>
 
-      {error && <div className={styles.errorBox}>{error}</div>}
+      {pageError && <div className={styles.errorBox}>{pageError}</div>}
 
       {/* Stats Overview Cards */}
       <StatCards
         usage={usage}
-        loading={loading}
+        loading={statCardsLoading}
         modelPrices={modelPrices}
         nowMs={nowMs}
-        sparklines={{
-          requests: requestsSparkline,
-          tokens: tokensSparkline,
-          rpm: rpmSparkline,
-          tpm: tpmSparkline,
-          cost: costSparkline,
-        }}
+        generalSummary={general?.summary ?? null}
+        sparklines={statCardSparklines}
       />
 
       {/* Chart Line Selection */}
@@ -370,3 +429,5 @@ export function UsagePage() {
     </div>
   );
 }
+
+

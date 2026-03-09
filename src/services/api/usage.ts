@@ -22,12 +22,51 @@ export interface UsageImportResponse {
   [key: string]: unknown;
 }
 
+export interface UsageGeneralPoint {
+  ts: string;
+  value: number;
+}
+
+export interface UsageGeneralSummary {
+  total_requests?: number;
+  success_count?: number;
+  failure_count?: number;
+  total_tokens?: number;
+  cached_tokens?: number;
+  reasoning_tokens?: number;
+  rpm_30m?: number;
+  rpm_request_count_30m?: number;
+  tpm_30m?: number;
+  tpm_token_count_30m?: number;
+  total_cost?: number;
+  cost_available?: boolean;
+}
+
+export interface UsageGeneralSeries {
+  requests_60m?: UsageGeneralPoint[];
+  tokens_60m?: UsageGeneralPoint[];
+  rpm_30m?: UsageGeneralPoint[];
+  tpm_30m?: UsageGeneralPoint[];
+  cost_30m?: UsageGeneralPoint[];
+}
+
+export interface UsageGeneralPayload {
+  summary?: UsageGeneralSummary;
+  series?: UsageGeneralSeries;
+}
+
 export const usageApi = {
   /**
    * 获取使用统计原始数据
    */
   getUsage: (range: UsageTimeRange = 'all') =>
     apiClient.get<Record<string, unknown>>('/usage', {
+      timeout: USAGE_TIMEOUT_MS,
+      params: { range },
+    }),
+
+  getUsageGeneral: (range: UsageTimeRange = 'all') =>
+    apiClient.get<UsageGeneralPayload>('/usage/general', {
       timeout: USAGE_TIMEOUT_MS,
       params: { range },
     }),

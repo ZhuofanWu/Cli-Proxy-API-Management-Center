@@ -12,6 +12,7 @@ import {
   type ModelPrice
 } from '@/utils/usage';
 import { sparklineOptions } from '@/utils/usage/chartConfig';
+import type { UsageGeneralSummary } from '@/services/api/usage';
 import type { UsagePayload } from './hooks/useUsageData';
 import type { SparklineBundle } from './hooks/useSparklines';
 import styles from '@/pages/UsagePage.module.scss';
@@ -33,6 +34,7 @@ export interface StatCardsProps {
   loading: boolean;
   modelPrices: Record<string, ModelPrice>;
   nowMs: number;
+  generalSummary?: UsageGeneralSummary | null;
   sparklines: {
     requests: SparklineBundle | null;
     tokens: SparklineBundle | null;
@@ -42,10 +44,24 @@ export interface StatCardsProps {
   };
 }
 
-export function StatCards({ usage, loading, modelPrices, nowMs, sparklines }: StatCardsProps) {
+export function StatCards({
+  usage,
+  loading,
+  modelPrices,
+  nowMs,
+  generalSummary,
+  sparklines,
+}: StatCardsProps) {
   const { t } = useTranslation();
 
-  const hasPrices = Object.keys(modelPrices).length > 0;
+  const hasPrices = generalSummary
+    ? Boolean(generalSummary.cost_available)
+    : Object.keys(modelPrices).length > 0;
+
+  const totalRequests = generalSummary?.total_requests ?? usage?.total_requests ?? 0;
+  const successCount = generalSummary?.success_count ?? usage?.success_count ?? 0;
+  const failureCount = generalSummary?.failure_count ?? usage?.failure_count ?? 0;
+  const totalTokens = generalSummary?.total_tokens ?? usage?.total_tokens ?? 0;
 
   const { tokenBreakdown, rateStats, totalCost } = useMemo(() => {
     const empty = {
@@ -53,6 +69,23 @@ export function StatCards({ usage, loading, modelPrices, nowMs, sparklines }: St
       rateStats: { rpm: 0, tpm: 0, windowMinutes: 30, requestCount: 0, tokenCount: 0 },
       totalCost: 0
     };
+
+    if (generalSummary) {
+      return {
+        tokenBreakdown: {
+          cachedTokens: generalSummary.cached_tokens ?? 0,
+          reasoningTokens: generalSummary.reasoning_tokens ?? 0,
+        },
+        rateStats: {
+          rpm: generalSummary.rpm_30m ?? 0,
+          tpm: generalSummary.tpm_30m ?? 0,
+          windowMinutes: 30,
+          requestCount: generalSummary.rpm_request_count_30m ?? 0,
+          tokenCount: generalSummary.tpm_token_count_30m ?? 0,
+        },
+        totalCost: generalSummary.total_cost ?? 0,
+      };
+    }
 
     if (!usage) return empty;
     const details = collectUsageDetails(usage);
@@ -102,7 +135,7 @@ export function StatCards({ usage, loading, modelPrices, nowMs, sparklines }: St
       },
       totalCost
     };
-  }, [hasPrices, modelPrices, nowMs, usage]);
+  }, [generalSummary, hasPrices, modelPrices, nowMs, usage]);
 
   const statsCards: StatCardData[] = [
     {
@@ -112,16 +145,16 @@ export function StatCards({ usage, loading, modelPrices, nowMs, sparklines }: St
       accent: '#8b8680',
       accentSoft: 'rgba(139, 134, 128, 0.18)',
       accentBorder: 'rgba(139, 134, 128, 0.35)',
-      value: loading ? '-' : (usage?.total_requests ?? 0).toLocaleString(),
+      value: loading ? '-' : totalRequests.toLocaleString(),
       meta: (
         <>
           <span className={styles.statMetaItem}>
             <span className={styles.statMetaDot} style={{ backgroundColor: '#10b981' }} />
-            {t('usage_stats.success_requests')}: {loading ? '-' : (usage?.success_count ?? 0)}
+            {t('usage_stats.success_requests')}: {loading ? '-' : successCount}
           </span>
           <span className={styles.statMetaItem}>
             <span className={styles.statMetaDot} style={{ backgroundColor: '#c65746' }} />
-            {t('usage_stats.failed_requests')}: {loading ? '-' : (usage?.failure_count ?? 0)}
+            {t('usage_stats.failed_requests')}: {loading ? '-' : failureCount}
           </span>
         </>
       ),
@@ -134,7 +167,7 @@ export function StatCards({ usage, loading, modelPrices, nowMs, sparklines }: St
       accent: '#8b5cf6',
       accentSoft: 'rgba(139, 92, 246, 0.18)',
       accentBorder: 'rgba(139, 92, 246, 0.35)',
-      value: loading ? '-' : formatCompactNumber(usage?.total_tokens ?? 0),
+      value: loading ? '-' : formatCompactNumber(totalTokens),
       meta: (
         <>
           <span className={styles.statMetaItem}>
@@ -188,7 +221,7 @@ export function StatCards({ usage, loading, modelPrices, nowMs, sparklines }: St
       meta: (
         <>
           <span className={styles.statMetaItem}>
-            {t('usage_stats.total_tokens')}: {loading ? '-' : formatCompactNumber(usage?.total_tokens ?? 0)}
+            {t('usage_stats.total_tokens')}: {loading ? '-' : formatCompactNumber(totalTokens)}
           </span>
           {!hasPrices && (
             <span className={`${styles.statMetaItem} ${styles.statSubtle}`}>
