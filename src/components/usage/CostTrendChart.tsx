@@ -35,6 +35,25 @@ export interface CostTrendChartProps {
 const COST_COLOR = '#f59e0b';
 const COST_BG = 'rgba(245, 158, 11, 0.15)';
 
+function PagerChevron({ direction }: { direction: 'left' | 'right' }) {
+  return (
+    <svg
+      className={styles.chartPagerIcon}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d={direction === 'left' ? 'M9.5 3.5L5 8l4.5 4.5' : 'M6.5 3.5L11 8l-4.5 4.5'}
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function buildGradient(ctx: ScriptableContext<'line'>) {
   const chart = ctx.chart;
   const area = chart.chartArea;
@@ -145,30 +164,28 @@ export function CostTrendChart({
         <div className={styles.tokenBreakdownHeaderActions}>
           {showPagination && (
             <div className={styles.tokenBreakdownPager} aria-label={t('usage_stats.cost_trend')}>
-              <span className={styles.tokenBreakdownPagerBracket} aria-hidden="true">
-                [
-              </span>
               <Button
                 variant="secondary"
                 size="sm"
+                className={styles.chartPagerButton}
                 onClick={onPageBackward}
                 disabled={!canPageBackward}
                 aria-label={t('auth_files.pagination_prev')}
+                title={t('auth_files.pagination_prev')}
               >
-                {'<'}
+                <PagerChevron direction="left" />
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
+                className={styles.chartPagerButton}
                 onClick={onPageForward}
                 disabled={!canPageForward}
                 aria-label={t('auth_files.pagination_next')}
+                title={t('auth_files.pagination_next')}
               >
-                {'>'}
+                <PagerChevron direction="right" />
               </Button>
-              <span className={styles.tokenBreakdownPagerBracket} aria-hidden="true">
-                ]
-              </span>
             </div>
           )}
           <div className={styles.periodButtons}>
