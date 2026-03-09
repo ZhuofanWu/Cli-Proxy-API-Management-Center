@@ -12,9 +12,12 @@ import { Input } from '@/components/ui/Input';
 import { IconCheck, IconChevronDown, IconChevronUp, IconRefreshCw, IconSearch } from '@/components/ui/icons';
 import { VisualConfigEditor } from '@/components/config/VisualConfigEditor';
 import { DiffModal } from '@/components/config/DiffModal';
+import { PriceSettingsCard } from '@/components/usage';
 import { useVisualConfig } from '@/hooks/useVisualConfig';
-import { useNotificationStore, useAuthStore, useThemeStore } from '@/stores';
+import { useNotificationStore, useAuthStore, useConfigStore, useThemeStore } from '@/stores';
+import { configApi } from '@/services/api';
 import { configFileApi } from '@/services/api/configFile';
+import type { ModelPrice } from '@/utils/usage';
 import styles from './ConfigPage.module.scss';
 
 type ConfigEditorTab = 'visual' | 'source';
@@ -34,6 +37,8 @@ export function ConfigPage() {
   const showNotification = useNotificationStore((state) => state.showNotification);
   const showConfirmation = useNotificationStore((state) => state.showConfirmation);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
+  const config = useConfigStore((state) => state.config);
+  const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
 
   const {
@@ -74,9 +79,19 @@ export function ConfigPage() {
   const disableControls = connectionStatus !== 'connected';
   const isDirty = dirty || visualDirty;
   const hasVisualModeError = !!visualParseError;
+  const modelPrices: Record<string, ModelPrice> = config?.modelPrices ?? {};
   const hasVisualValidationErrors =
     activeTab === 'visual' &&
     (Object.values(visualValidationErrors).some(Boolean) || visualHasPayloadValidationErrors);
+
+  const refreshConfigStore = useCallback(async () => {
+    try {
+      await fetchConfig(undefined, true);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('notification.refresh_failed');
+      showNotification(`${t('notification.refresh_failed')}: ${message}`, 'warning');
+    }
+  }, [fetchConfig, showNotification, t]);
 
   const loadConfig = useCallback(async () => {
     setLoading(true);
@@ -99,7 +114,8 @@ export function ConfigPage() {
 
   useEffect(() => {
     loadConfig();
-  }, [loadConfig]);
+    void refreshConfigStore();
+  }, [loadConfig, refreshConfigStore]);
 
   useEffect(() => {
     if (activeTab !== 'visual' || !visualParseError) return;
@@ -127,6 +143,7 @@ export function ConfigPage() {
       setServerYaml(latestContent);
       setMergedYaml(latestContent);
       loadVisualValuesFromYaml(latestContent);
+      await refreshConfigStore();
       showNotification(t('config_management.save_success'), 'success');
       if (commercialModeChanged) {
         showNotification(t('notification.commercial_mode_restart_required'), 'warning');
@@ -202,6 +219,21 @@ export function ConfigPage() {
     setContent(value);
     setDirty(true);
   }, []);
+
+  const handleModelPricesChange = useCallback(
+    async (prices: Record<string, ModelPrice>) => {
+      await configApi.updateModelPrices(prices);
+
+      try {
+        await loadConfig();
+      } catch {
+        // loadConfig already updates page error state; continue refreshing normalized config.
+      }
+
+      await refreshConfigStore();
+    },
+    [loadConfig, refreshConfigStore]
+  );
 
   const handleTabChange = useCallback((tab: ConfigEditorTab) => {
     if (tab === activeTab) return;
@@ -611,6 +643,20 @@ export function ConfigPage() {
           </div>
         </div>
       </Card>
+
+      <PriceSettingsCard
+        className={styles.modelPriceCard}
+        modelNames={Object.keys(modelPrices)}
+        modelPrices={modelPrices}
+        onPricesChange={handleModelPricesChange}
+        disabled={disableControls || loading || saving || isDirty}
+        loading={loading}
+        helperText={
+          isDirty
+            ? t('config_management.model_price_dirty_hint')
+            : t('config_management.model_price_persist_hint')
+        }
+      />
 
       {typeof document !== 'undefined' ? createPortal(floatingActions, document.body) : null}
       <DiffModal

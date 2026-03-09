@@ -13,6 +13,12 @@ export interface QuotaExceededConfig {
   switchPreviewModel?: boolean;
 }
 
+export interface ConfigModelPrice {
+  prompt: number;
+  completion: number;
+  cache: number;
+}
+
 export interface Config {
   debug?: boolean;
   proxyUrl?: string;
@@ -34,6 +40,7 @@ export interface Config {
   vertexApiKeys?: ProviderKeyConfig[];
   openaiCompatibility?: OpenAIProviderConfig[];
   oauthExcludedModels?: Record<string, string[]>;
+  modelPrices?: Record<string, ConfigModelPrice>;
   raw?: Record<string, unknown>;
 }
 

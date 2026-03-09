@@ -3,12 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { USAGE_STATS_STALE_TIME_MS, useNotificationStore, useUsageStatsStore } from '@/stores';
 import { usageApi } from '@/services/api/usage';
 import { downloadBlob } from '@/utils/download';
-import {
-  loadModelPrices,
-  saveModelPrices,
-  type ModelPrice,
-  type UsageTimeRange,
-} from '@/utils/usage';
+import { type UsageTimeRange } from '@/utils/usage';
 
 export interface UsagePayload {
   total_requests?: number;
@@ -24,8 +19,6 @@ export interface UseUsageDataReturn {
   loading: boolean;
   error: string;
   lastRefreshedAt: Date | null;
-  modelPrices: Record<string, ModelPrice>;
-  setModelPrices: (prices: Record<string, ModelPrice>) => void;
   loadUsage: () => Promise<void>;
   handleExport: () => Promise<void>;
   handleImport: () => void;
@@ -46,7 +39,6 @@ export function useUsageData(timeRange: UsageTimeRange): UseUsageDataReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
-  const [modelPrices, setModelPrices] = useState<Record<string, ModelPrice>>({});
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -69,10 +61,6 @@ export function useUsageData(timeRange: UsageTimeRange): UseUsageDataReturn {
       setLoading(false);
     }
   }, [t, timeRange]);
-
-  useEffect(() => {
-    setModelPrices(loadModelPrices());
-  }, []);
 
   useEffect(() => {
     void loadUsage().catch(() => {});
@@ -157,18 +145,11 @@ export function useUsageData(timeRange: UsageTimeRange): UseUsageDataReturn {
     }
   };
 
-  const handleSetModelPrices = useCallback((prices: Record<string, ModelPrice>) => {
-    setModelPrices(prices);
-    saveModelPrices(prices);
-  }, []);
-
   return {
     usage,
     loading,
     error,
     lastRefreshedAt,
-    modelPrices,
-    setModelPrices: handleSetModelPrices,
     loadUsage,
     handleExport,
     handleImport,

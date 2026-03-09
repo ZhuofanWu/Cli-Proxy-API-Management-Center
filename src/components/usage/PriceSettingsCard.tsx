@@ -1,25 +1,59 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
+import { AutocompleteInput } from '@/components/ui/AutocompleteInput';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { Select } from '@/components/ui/Select';
+import { useNotificationStore } from '@/stores';
 import type { ModelPrice } from '@/utils/usage';
-import styles from '@/pages/UsagePage.module.scss';
+import styles from './PriceSettingsCard.module.scss';
 
 export interface PriceSettingsCardProps {
   modelNames: string[];
   modelPrices: Record<string, ModelPrice>;
-  onPricesChange: (prices: Record<string, ModelPrice>) => void;
+  onPricesChange: (prices: Record<string, ModelPrice>) => Promise<void> | void;
+  disabled?: boolean;
+  loading?: boolean;
+  helperText?: string;
+  className?: string;
 }
+
+const getErrorMessage = (value: unknown) => (value instanceof Error ? value.message : '');
+
+const parsePriceInput = (raw: string, fallback?: number): number | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return fallback ?? 0;
+  }
+  if (/e/i.test(trimmed)) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+
+  const [, decimal = ''] = trimmed.split('.');
+  if (decimal.length > 3) {
+    return null;
+  }
+
+  return parsed;
+};
 
 export function PriceSettingsCard({
   modelNames,
   modelPrices,
-  onPricesChange
+  onPricesChange,
+  disabled = false,
+  loading = false,
+  helperText,
+  className,
 }: PriceSettingsCardProps) {
   const { t } = useTranslation();
+  const showNotification = useNotificationStore((state) => state.showNotification);
 
   // Add form state
   const [selectedModel, setSelectedModel] = useState('');
@@ -32,24 +66,98 @@ export function PriceSettingsCard({
   const [editPrompt, setEditPrompt] = useState('');
   const [editCompletion, setEditCompletion] = useState('');
   const [editCache, setEditCache] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSavePrice = () => {
-    if (!selectedModel) return;
-    const prompt = parseFloat(promptPrice) || 0;
-    const completion = parseFloat(completionPrice) || 0;
-    const cache = cachePrice.trim() === '' ? prompt : parseFloat(cachePrice) || 0;
-    const newPrices = { ...modelPrices, [selectedModel]: { prompt, completion, cache } };
-    onPricesChange(newPrices);
+  const resolvedSuggestions = useMemo(
+    () => Array.from(new Set([...Object.keys(modelPrices), ...modelNames].map((name) => name.trim()).filter(Boolean))),
+    [modelNames, modelPrices]
+  );
+
+  const busy = disabled || loading || submitting;
+
+  const getValidatedPriceSet = (
+    model: string,
+    promptValue: string,
+    completionValue: string,
+    cacheValue: string
+  ): { modelName: string; price: ModelPrice } | null => {
+    const modelName = model.trim();
+    if (!modelName) {
+      showNotification(t('usage_stats.model_price_model_required'), 'error');
+      return null;
+    }
+
+    const prompt = parsePriceInput(promptValue);
+    const completion = parsePriceInput(completionValue);
+    const cache = parsePriceInput(cacheValue, prompt ?? undefined);
+    if (prompt === null || completion === null || cache === null) {
+      showNotification(t('usage_stats.model_price_precision_hint'), 'error');
+      return null;
+    }
+
+    return {
+      modelName,
+      price: {
+        prompt,
+        completion,
+        cache,
+      },
+    };
+  };
+
+  const commitPrices = async (prices: Record<string, ModelPrice>, successMessage?: string) => {
+    setSubmitting(true);
+    try {
+      await onPricesChange(prices);
+      if (successMessage) {
+        showNotification(successMessage, 'success');
+      }
+      return true;
+    } catch (error: unknown) {
+      const message = getErrorMessage(error);
+      showNotification(
+        `${t('notification.save_failed')}${message ? `: ${message}` : ''}`,
+        'error'
+      );
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSavePrice = async () => {
+    const nextPrice = getValidatedPriceSet(selectedModel, promptPrice, completionPrice, cachePrice);
+    if (!nextPrice) {
+      return;
+    }
+
+    const newPrices = { ...modelPrices, [nextPrice.modelName]: nextPrice.price };
+    const saved = await commitPrices(newPrices, t('usage_stats.model_price_saved'));
+    if (!saved) {
+      return;
+    }
+
     setSelectedModel('');
     setPromptPrice('');
     setCompletionPrice('');
     setCachePrice('');
   };
 
-  const handleDeletePrice = (model: string) => {
+  const handleDeletePrice = async (model: string) => {
     const newPrices = { ...modelPrices };
     delete newPrices[model];
-    onPricesChange(newPrices);
+    setSubmitting(true);
+    try {
+      await onPricesChange(newPrices);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error);
+      showNotification(
+        `${t('notification.delete_failed')}${message ? `: ${message}` : ''}`,
+        'error'
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleOpenEdit = (model: string) => {
@@ -60,13 +168,20 @@ export function PriceSettingsCard({
     setEditCache(price?.cache?.toString() || '');
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editModel) return;
-    const prompt = parseFloat(editPrompt) || 0;
-    const completion = parseFloat(editCompletion) || 0;
-    const cache = editCache.trim() === '' ? prompt : parseFloat(editCache) || 0;
-    const newPrices = { ...modelPrices, [editModel]: { prompt, completion, cache } };
-    onPricesChange(newPrices);
+
+    const nextPrice = getValidatedPriceSet(editModel, editPrompt, editCompletion, editCache);
+    if (!nextPrice) {
+      return;
+    }
+
+    const newPrices = { ...modelPrices, [nextPrice.modelName]: nextPrice.price };
+    const saved = await commitPrices(newPrices, t('usage_stats.model_price_saved'));
+    if (!saved) {
+      return;
+    }
+
     setEditModel(null);
   };
 
@@ -84,27 +199,23 @@ export function PriceSettingsCard({
     }
   };
 
-  const options = useMemo(
-    () => [
-      { value: '', label: t('usage_stats.model_price_select_placeholder') },
-      ...modelNames.map((name) => ({ value: name, label: name }))
-    ],
-    [modelNames, t]
-  );
-
   return (
-    <Card title={t('usage_stats.model_price_settings')}>
+    <Card title={t('usage_stats.model_price_settings')} className={className}>
       <div className={styles.pricingSection}>
+        {helperText && <div className={styles.helperText}>{helperText}</div>}
+
         {/* Price Form */}
         <div className={styles.priceForm}>
           <div className={styles.formRow}>
             <div className={styles.formField}>
               <label>{t('usage_stats.model_name')}</label>
-              <Select
+              <AutocompleteInput
                 value={selectedModel}
-                options={options}
+                options={resolvedSuggestions}
                 onChange={handleModelSelect}
                 placeholder={t('usage_stats.model_price_select_placeholder')}
+                hint={t('usage_stats.model_price_select_hint')}
+                disabled={busy}
               />
             </div>
             <div className={styles.formField}>
@@ -114,7 +225,9 @@ export function PriceSettingsCard({
                 value={promptPrice}
                 onChange={(e) => setPromptPrice(e.target.value)}
                 placeholder="0.00"
-                step="0.0001"
+                step="0.001"
+                min="0"
+                disabled={busy}
               />
             </div>
             <div className={styles.formField}>
@@ -124,7 +237,9 @@ export function PriceSettingsCard({
                 value={completionPrice}
                 onChange={(e) => setCompletionPrice(e.target.value)}
                 placeholder="0.00"
-                step="0.0001"
+                step="0.001"
+                min="0"
+                disabled={busy}
               />
             </div>
             <div className={styles.formField}>
@@ -134,10 +249,17 @@ export function PriceSettingsCard({
                 value={cachePrice}
                 onChange={(e) => setCachePrice(e.target.value)}
                 placeholder="0.00"
-                step="0.0001"
+                step="0.001"
+                min="0"
+                disabled={busy}
               />
             </div>
-            <Button variant="primary" onClick={handleSavePrice} disabled={!selectedModel}>
+            <Button
+              variant="primary"
+              onClick={() => void handleSavePrice()}
+              disabled={!selectedModel.trim() || busy}
+              loading={submitting}
+            >
               {t('common.save')}
             </Button>
           </div>
@@ -165,10 +287,20 @@ export function PriceSettingsCard({
                     </div>
                   </div>
                   <div className={styles.priceActions}>
-                    <Button variant="secondary" size="sm" onClick={() => handleOpenEdit(model)}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleOpenEdit(model)}
+                      disabled={busy}
+                    >
                       {t('common.edit')}
                     </Button>
-                    <Button variant="danger" size="sm" onClick={() => handleDeletePrice(model)}>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => void handleDeletePrice(model)}
+                      disabled={busy}
+                    >
                       {t('common.delete')}
                     </Button>
                   </div>
@@ -176,7 +308,9 @@ export function PriceSettingsCard({
               ))}
             </div>
           ) : (
-            <div className={styles.hint}>{t('usage_stats.model_price_empty')}</div>
+            <div className={styles.hint}>
+              {loading ? t('common.loading') : t('usage_stats.model_price_empty')}
+            </div>
           )}
         </div>
       </div>
@@ -188,10 +322,10 @@ export function PriceSettingsCard({
         onClose={() => setEditModel(null)}
         footer={
           <div className={styles.priceActions}>
-            <Button variant="secondary" onClick={() => setEditModel(null)}>
+            <Button variant="secondary" onClick={() => setEditModel(null)} disabled={busy}>
               {t('common.cancel')}
             </Button>
-            <Button variant="primary" onClick={handleSaveEdit}>
+            <Button variant="primary" onClick={() => void handleSaveEdit()} loading={submitting}>
               {t('common.save')}
             </Button>
           </div>
@@ -206,7 +340,9 @@ export function PriceSettingsCard({
               value={editPrompt}
               onChange={(e) => setEditPrompt(e.target.value)}
               placeholder="0.00"
-              step="0.0001"
+              step="0.001"
+              min="0"
+              disabled={busy}
             />
           </div>
           <div className={styles.formField}>
@@ -216,7 +352,9 @@ export function PriceSettingsCard({
               value={editCompletion}
               onChange={(e) => setEditCompletion(e.target.value)}
               placeholder="0.00"
-              step="0.0001"
+              step="0.001"
+              min="0"
+              disabled={busy}
             />
           </div>
           <div className={styles.formField}>
@@ -226,7 +364,9 @@ export function PriceSettingsCard({
               value={editCache}
               onChange={(e) => setEditCache(e.target.value)}
               placeholder="0.00"
-              step="0.0001"
+              step="0.001"
+              min="0"
+              disabled={busy}
             />
           </div>
         </div>

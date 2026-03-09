@@ -9,7 +9,7 @@ import type {
   AmpcodeModelMapping,
   AmpcodeUpstreamApiKeyMapping
 } from '@/types';
-import type { Config, UsageStatisticsStorageWay } from '@/types/config';
+import type { Config, ConfigModelPrice, UsageStatisticsStorageWay } from '@/types/config';
 import { buildHeaderObject } from '@/utils/headers';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -40,6 +40,48 @@ const normalizeUsageStatisticsStorageWay = (
     default:
       return undefined;
   }
+};
+
+const normalizeFiniteNumber = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+};
+
+const normalizeModelPriceMap = (input: unknown): Record<string, ConfigModelPrice> | undefined => {
+  if (!Array.isArray(input)) {
+    return undefined;
+  }
+
+  const normalized: Record<string, ConfigModelPrice> = {};
+  input.forEach((entry) => {
+    if (!isRecord(entry)) {
+      return;
+    }
+
+    const name = String(entry.name ?? '').trim();
+    if (!name) {
+      return;
+    }
+
+    const prompt = normalizeFiniteNumber(entry.input);
+    const completion = normalizeFiniteNumber(entry.output);
+    const cache = normalizeFiniteNumber(entry.cache_read) ?? prompt;
+    if (prompt === undefined || completion === undefined || cache === undefined) {
+      return;
+    }
+
+    normalized[name] = { prompt, completion, cache };
+  });
+
+  return normalized;
 };
 
 const normalizeModelAliases = (models: unknown): ModelAlias[] => {
@@ -461,6 +503,11 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
   const oauthExcluded = normalizeOauthExcluded(raw['oauth-excluded-models'] ?? raw.oauthExcludedModels);
   if (oauthExcluded) {
     config.oauthExcludedModels = oauthExcluded;
+  }
+
+  const modelPrices = normalizeModelPriceMap(raw['model_price'] ?? raw.modelPrice);
+  if (modelPrices !== undefined) {
+    config.modelPrices = modelPrices;
   }
 
   return config;

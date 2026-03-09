@@ -3,7 +3,7 @@
  */
 
 import { apiClient } from './client';
-import type { Config, UsageStatisticsStorageWay } from '@/types';
+import type { Config, ConfigModelPrice, UsageStatisticsStorageWay } from '@/types';
 import { normalizeConfigResponse } from './transformers';
 
 export const configApi = {
@@ -133,4 +133,17 @@ export const configApi = {
    * 更新路由策略
    */
   updateRoutingStrategy: (strategy: string) => apiClient.put('/routing/strategy', { value: strategy }),
+
+  /**
+   * 更新模型价格配置
+   */
+  updateModelPrices: (modelPrices: Record<string, ConfigModelPrice>) =>
+    apiClient.put('/model-price', {
+      model_price: Object.entries(modelPrices).map(([name, price]) => ({
+        name,
+        input: Number(price.prompt) || 0,
+        output: Number(price.completion) || 0,
+        cache_read: Number(price.cache) || 0,
+      })),
+    }),
 };

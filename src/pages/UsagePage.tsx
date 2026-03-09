@@ -23,7 +23,6 @@ import {
   ChartLineSelector,
   ApiDetailsCard,
   ModelStatsCard,
-  PriceSettingsCard,
   CredentialStatsCard,
   RequestEventsDetailsCard,
   TokenBreakdownChart,
@@ -37,6 +36,7 @@ import {
   getModelNamesFromUsage,
   getApiStats,
   getModelStats,
+  type ModelPrice,
   type UsageTimeRange,
 } from '@/utils/usage';
 import styles from './UsagePage.module.scss';
@@ -69,6 +69,7 @@ const HOUR_WINDOW_BY_TIME_RANGE: Record<Exclude<UsageTimeRange, 'all'>, number> 
   '24h': 24,
   '7d': 7 * 24,
 };
+const EMPTY_MODEL_PRICES: Record<string, ModelPrice> = {};
 
 const isUsageTimeRange = (value: unknown): value is UsageTimeRange =>
   value === '7h' || value === '24h' || value === '7d' || value === 'all';
@@ -120,6 +121,7 @@ export function UsagePage() {
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const isDark = resolvedTheme === 'dark';
   const config = useConfigStore((state) => state.config);
+  const modelPrices = config?.modelPrices ?? EMPTY_MODEL_PRICES;
 
   const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
   const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
@@ -130,8 +132,6 @@ export function UsagePage() {
     loading,
     error,
     lastRefreshedAt,
-    modelPrices,
-    setModelPrices,
     loadUsage,
     handleExport,
     handleImport,
@@ -366,13 +366,6 @@ export function UsagePage() {
         codexConfigs={config?.codexApiKeys || []}
         vertexConfigs={config?.vertexApiKeys || []}
         openaiProviders={config?.openaiCompatibility || []}
-      />
-
-      {/* Price Settings */}
-      <PriceSettingsCard
-        modelNames={modelNames}
-        modelPrices={modelPrices}
-        onPricesChange={setModelPrices}
       />
     </div>
   );

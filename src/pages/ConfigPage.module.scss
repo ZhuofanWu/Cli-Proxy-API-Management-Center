@@ -301,6 +301,10 @@
   overflow: visible;
 }
 
+.modelPriceCard {
+  margin-top: $spacing-lg;
+}
+
 .actions {
   display: flex;
   gap: $spacing-sm;
