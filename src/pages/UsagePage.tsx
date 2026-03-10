@@ -33,7 +33,9 @@ import {
   useUsageGeneralData,
   useUsageHealthData,
   useUsageRankingsData,
+  useUsageMetricTrendData,
   useUsageCostTrendData,
+  useUsageTrendModelsData,
   useUsageTokenBreakdownData,
   useUsageGeneralSparklines,
   useSparklines,
@@ -47,6 +49,7 @@ import {
   type UsageTimeRange,
 } from '@/utils/usage';
 import {
+  type UsageChartGranularity,
   type UsageCostTrendGranularity,
   type UsageTokenBreakdownGranularity,
 } from '@/services/api/usage';
@@ -139,6 +142,8 @@ export function UsagePage() {
 
   const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
   const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
+  const [requestsPeriod, setRequestsPeriod] = useState<UsageChartGranularity>('day');
+  const [tokensPeriod, setTokensPeriod] = useState<UsageChartGranularity>('day');
   const [tokenBreakdownPeriod, setTokenBreakdownPeriod] =
     useState<UsageTokenBreakdownGranularity>('hour');
   const [tokenBreakdownOffset, setTokenBreakdownOffset] = useState(0);
@@ -194,6 +199,30 @@ export function UsagePage() {
   } = useUsageRankingsData(timeRange, isSqliteUsage);
 
   const {
+    snapshot: trendModelsSnapshot,
+    loading: trendModelsLoading,
+    error: trendModelsError,
+    lastRefreshedAt: trendModelsLastRefreshedAt,
+    loadUsageTrendModels,
+  } = useUsageTrendModelsData(timeRange, isSqliteUsage);
+
+  const {
+    trend: requestsTrend,
+    loading: requestsTrendLoading,
+    error: requestsTrendError,
+    lastRefreshedAt: requestsTrendLastRefreshedAt,
+    loadUsageMetricTrend: loadUsageRequestTrend,
+  } = useUsageMetricTrendData('requests', requestsPeriod, timeRange, chartLines, isSqliteUsage);
+
+  const {
+    trend: tokensTrend,
+    loading: tokensTrendLoading,
+    error: tokensTrendError,
+    lastRefreshedAt: tokensTrendLastRefreshedAt,
+    loadUsageMetricTrend: loadUsageTokenTrend,
+  } = useUsageMetricTrendData('tokens', tokensPeriod, timeRange, chartLines, isSqliteUsage);
+
+  const {
     tokenBreakdown,
     loading: tokenBreakdownLoading,
     error: tokenBreakdownError,
@@ -227,6 +256,9 @@ export function UsagePage() {
         loadUsageHealth(),
         loadUsageCredentials(),
         loadUsageRankings(),
+        loadUsageTrendModels(),
+        loadUsageRequestTrend(),
+        loadUsageTokenTrend(),
         loadUsageTokenBreakdown(),
         loadUsageCostTrend(),
       ]);
@@ -240,6 +272,9 @@ export function UsagePage() {
     loadUsageHealth,
     loadUsageCredentials,
     loadUsageRankings,
+    loadUsageTrendModels,
+    loadUsageRequestTrend,
+    loadUsageTokenTrend,
     loadUsageTokenBreakdown,
     loadUsageCostTrend,
   ]);
@@ -318,6 +353,9 @@ export function UsagePage() {
 
   const effectiveLastRefreshedAt = isSqliteUsage
     ? (generalLastRefreshedAt ??
+      trendModelsLastRefreshedAt ??
+      requestsTrendLastRefreshedAt ??
+      tokensTrendLastRefreshedAt ??
       rankingsLastRefreshedAt ??
       healthLastRefreshedAt ??
       credentialsLastRefreshedAt ??
@@ -362,6 +400,9 @@ export function UsagePage() {
     healthError,
     credentialsError,
     rankingsError,
+    trendModelsError,
+    requestsTrendError,
+    tokensTrendError,
     tokenBreakdownError,
     costTrendError,
   ]
@@ -376,6 +417,8 @@ export function UsagePage() {
   const canPageToNewerTokenBreakdown = tokenBreakdownPagingEnabled && tokenBreakdownOffset > 0;
   const costTrendCardLoading = isSqliteUsage && hasPrices ? costTrendLoading : loading;
   const detailsCardLoading = isSqliteUsage ? rankingsLoading : loading;
+  const requestsChartLoading = isSqliteUsage ? requestsTrendLoading : loading;
+  const tokensChartLoading = isSqliteUsage ? tokensTrendLoading : loading;
   const costTrendPagingEnabled = isSqliteUsage && costTrendPeriod === 'day' && timeRange === 'all';
   const canPageToOlderCostTrend = costTrendPagingEnabled && Boolean(costTrend?.has_older);
   const canPageToNewerCostTrend = costTrendPagingEnabled && costTrendOffset > 0;
@@ -393,6 +436,9 @@ export function UsagePage() {
           loadUsageHealth().catch(() => {}),
           loadUsageCredentials().catch(() => {}),
           loadUsageRankings().catch(() => {}),
+          loadUsageTrendModels().catch(() => {}),
+          loadUsageRequestTrend().catch(() => {}),
+          loadUsageTokenTrend().catch(() => {}),
           loadUsageTokenBreakdown().catch(() => {}),
           loadUsageCostTrend().catch(() => {}),
         ]);
@@ -405,6 +451,9 @@ export function UsagePage() {
       loadUsageHealth,
       loadUsageCredentials,
       loadUsageRankings,
+      loadUsageTrendModels,
+      loadUsageRequestTrend,
+      loadUsageTokenTrend,
       loadUsageTokenBreakdown,
       loadUsageCostTrend,
     ]
@@ -439,19 +488,29 @@ export function UsagePage() {
   }, [canPageToNewerCostTrend]);
 
   // Chart data hook
-  const {
-    requestsPeriod,
-    setRequestsPeriod,
-    tokensPeriod,
-    setTokensPeriod,
-    requestsChartData,
-    tokensChartData,
-    requestsChartOptions,
-    tokensChartOptions,
-  } = useChartData({ usage, chartLines, isDark, isMobile, hourWindowHours });
+  const { requestsChartData, tokensChartData, requestsChartOptions, tokensChartOptions } =
+    useChartData({
+      usage,
+      chartLines,
+      isDark,
+      isMobile,
+      hourWindowHours,
+      requestsPeriod,
+      tokensPeriod,
+      sqliteRequestsTrend: isSqliteUsage ? requestsTrend : null,
+      sqliteTokensTrend: isSqliteUsage ? tokensTrend : null,
+    });
 
   // Derived data
-  const modelNames = useMemo(() => getModelNamesFromUsage(usage), [usage]);
+  const memoryModelNames = useMemo(() => getModelNamesFromUsage(usage), [usage]);
+  const sqliteModelNames = useMemo(() => {
+    const fetchedModels = (trendModelsSnapshot?.models ?? [])
+      .map((item) => (typeof item.model_name === 'string' ? item.model_name.trim() : ''))
+      .filter(Boolean);
+    const selectedModels = chartLines.filter((line) => line !== 'all');
+    return Array.from(new Set([...fetchedModels, ...selectedModels]));
+  }, [chartLines, trendModelsSnapshot?.models]);
+  const modelNames = isSqliteUsage ? sqliteModelNames : memoryModelNames;
   const memoryApiStats = useMemo(() => getApiStats(usage, modelPrices), [usage, modelPrices]);
   const memoryModelStats = useMemo(() => getModelStats(usage, modelPrices), [usage, modelPrices]);
   const apiStats = isSqliteUsage ? sqliteApiStats : memoryApiStats;
@@ -509,6 +568,9 @@ export function UsagePage() {
               generalLoading ||
               healthLoading ||
               rankingsLoading ||
+              trendModelsLoading ||
+              requestsTrendLoading ||
+              tokensTrendLoading ||
               tokenBreakdownLoading ||
               costTrendLoading ||
               exporting ||
@@ -519,6 +581,9 @@ export function UsagePage() {
             generalLoading ||
             healthLoading ||
             rankingsLoading ||
+            trendModelsLoading ||
+            requestsTrendLoading ||
+            tokensTrendLoading ||
             tokenBreakdownLoading ||
             costTrendLoading
               ? t('common.loading')
@@ -576,7 +641,7 @@ export function UsagePage() {
           onPeriodChange={setRequestsPeriod}
           chartData={requestsChartData}
           chartOptions={requestsChartOptions}
-          loading={loading}
+          loading={requestsChartLoading}
           isMobile={isMobile}
           emptyText={t('usage_stats.no_data')}
         />
@@ -586,7 +651,7 @@ export function UsagePage() {
           onPeriodChange={setTokensPeriod}
           chartData={tokensChartData}
           chartOptions={tokensChartOptions}
-          loading={loading}
+          loading={tokensChartLoading}
           isMobile={isMobile}
           emptyText={t('usage_stats.no_data')}
         />

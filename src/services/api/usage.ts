@@ -182,6 +182,48 @@ export interface UsageCostTrendPayload {
   buckets?: UsageCostTrendBucket[];
 }
 
+export interface UsageMetricTrendSeries {
+  model_name?: string;
+  is_all?: boolean;
+  values?: number[];
+}
+
+export interface UsageMetricTrendPayload {
+  metric?: string;
+  granularity?: UsageChartGranularity;
+  range?: UsageTimeRange;
+  labels?: string[];
+  series?: UsageMetricTrendSeries[];
+}
+
+export interface UsageTrendModelItem {
+  model_name?: string;
+  requests?: number;
+  tokens?: number;
+}
+
+export interface UsageTrendModelsPayload {
+  range?: UsageTimeRange;
+  models?: UsageTrendModelItem[];
+}
+
+const buildTrendQueryParams = (
+  granularity: UsageChartGranularity,
+  range: UsageTimeRange,
+  models: string[]
+) => {
+  const params = new URLSearchParams();
+  params.set('granularity', granularity);
+  params.set('range', range);
+  models.forEach((model) => {
+    const trimmed = model.trim();
+    if (trimmed) {
+      params.append('model', trimmed);
+    }
+  });
+  return params;
+};
+
 export const usageApi = {
   /**
    * 获取使用统计原始数据
@@ -262,6 +304,32 @@ export const usageApi = {
     apiClient.get<UsageCostTrendPayload>('/usage/cost-trend', {
       timeout: USAGE_TIMEOUT_MS,
       params: { granularity, range, offset },
+    }),
+
+  getUsageRequestTrend: (
+    granularity: UsageChartGranularity,
+    range: UsageTimeRange = 'all',
+    models: string[] = []
+  ) =>
+    apiClient.get<UsageMetricTrendPayload>('/usage/request-trend', {
+      timeout: USAGE_TIMEOUT_MS,
+      params: buildTrendQueryParams(granularity, range, models),
+    }),
+
+  getUsageTokenTrend: (
+    granularity: UsageChartGranularity,
+    range: UsageTimeRange = 'all',
+    models: string[] = []
+  ) =>
+    apiClient.get<UsageMetricTrendPayload>('/usage/token-trend', {
+      timeout: USAGE_TIMEOUT_MS,
+      params: buildTrendQueryParams(granularity, range, models),
+    }),
+
+  getUsageModels: (range: UsageTimeRange = 'all') =>
+    apiClient.get<UsageTrendModelsPayload>('/usage/models', {
+      timeout: USAGE_TIMEOUT_MS,
+      params: { range },
     }),
 
   getFullUsage: () =>

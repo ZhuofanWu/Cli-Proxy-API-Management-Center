@@ -25,7 +25,7 @@ export function ChartLineSelector({
     const unusedModel = modelNames.find((m) => !chartLines.includes(m));
     if (unusedModel) {
       onChange([...chartLines, unusedModel]);
-    } else {
+    } else if (!chartLines.includes('all')) {
       onChange([...chartLines, 'all']);
     }
   };

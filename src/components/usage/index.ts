@@ -17,6 +17,12 @@ export type { UseUsageTokenBreakdownDataReturn } from './hooks/useUsageTokenBrea
 export { useUsageCostTrendData } from './hooks/useUsageCostTrendData';
 export type { UseUsageCostTrendDataReturn } from './hooks/useUsageCostTrendData';
 
+export { useUsageMetricTrendData } from './hooks/useUsageMetricTrendData';
+export type { UseUsageMetricTrendDataReturn } from './hooks/useUsageMetricTrendData';
+
+export { useUsageTrendModelsData } from './hooks/useUsageTrendModelsData';
+export type { UseUsageTrendModelsDataReturn } from './hooks/useUsageTrendModelsData';
+
 export { useSparklines } from './hooks/useSparklines';
 export type {
   SparklineData,
