@@ -163,7 +163,7 @@ export function UsagePage() {
     importInputRef,
     exporting,
     importing,
-  } = useUsageData(timeRange);
+  } = useUsageData(timeRange, !isSqliteUsage);
 
   const {
     general,
@@ -251,7 +251,6 @@ export function UsagePage() {
   const loadPageData = useCallback(async () => {
     if (isSqliteUsage) {
       await Promise.all([
-        loadUsage(),
         loadUsageGeneral(),
         loadUsageHealth(),
         loadUsageCredentials(),
@@ -360,8 +359,7 @@ export function UsagePage() {
       healthLastRefreshedAt ??
       credentialsLastRefreshedAt ??
       tokenBreakdownLastRefreshedAt ??
-      costTrendLastRefreshedAt ??
-      lastRefreshedAt)
+      costTrendLastRefreshedAt)
     : lastRefreshedAt;
   const nowMs = effectiveLastRefreshedAt?.getTime() ?? 0;
 

@@ -30,7 +30,10 @@ export interface UseUsageDataReturn {
 
 const getErrorMessage = (value: unknown) => (value instanceof Error ? value.message : '');
 
-export function useUsageData(timeRange: UsageTimeRange): UseUsageDataReturn {
+export function useUsageData(
+  timeRange: UsageTimeRange,
+  enabled = true
+): UseUsageDataReturn {
   const { t } = useTranslation();
   const { showNotification } = useNotificationStore();
   const loadUsageStats = useUsageStatsStore((state) => state.loadUsageStats);
@@ -44,6 +47,14 @@ export function useUsageData(timeRange: UsageTimeRange): UseUsageDataReturn {
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadUsage = useCallback(async () => {
+    if (!enabled) {
+      setUsage(null);
+      setError('');
+      setLoading(false);
+      setLastRefreshedAt(null);
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await usageApi.getUsage(timeRange);
@@ -60,11 +71,19 @@ export function useUsageData(timeRange: UsageTimeRange): UseUsageDataReturn {
     } finally {
       setLoading(false);
     }
-  }, [t, timeRange]);
+  }, [enabled, t, timeRange]);
 
   useEffect(() => {
+    if (!enabled) {
+      setUsage(null);
+      setError('');
+      setLoading(false);
+      setLastRefreshedAt(null);
+      return;
+    }
+
     void loadUsage().catch(() => {});
-  }, [loadUsage]);
+  }, [enabled, loadUsage]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -122,17 +141,19 @@ export function useUsageData(timeRange: UsageTimeRange): UseUsageDataReturn {
         }),
         'success'
       );
-      try {
-        await Promise.all([
-          loadUsage(),
-          loadUsageStats({ force: true, staleTimeMs: USAGE_STATS_STALE_TIME_MS }),
-        ]);
-      } catch (err: unknown) {
-        const message = getErrorMessage(err);
-        showNotification(
-          `${t('notification.refresh_failed')}${message ? `: ${message}` : ''}`,
-          'error'
-        );
+      if (enabled) {
+        try {
+          await Promise.all([
+            loadUsage(),
+            loadUsageStats({ force: true, staleTimeMs: USAGE_STATS_STALE_TIME_MS }),
+          ]);
+        } catch (err: unknown) {
+          const message = getErrorMessage(err);
+          showNotification(
+            `${t('notification.refresh_failed')}${message ? `: ${message}` : ''}`,
+            'error'
+          );
+        }
       }
     } catch (err: unknown) {
       const message = getErrorMessage(err);
