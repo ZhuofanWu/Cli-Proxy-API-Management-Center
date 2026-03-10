@@ -6,9 +6,11 @@ import {
   collectUsageDetails,
   buildCandidateUsageSourceIds,
   formatCompactNumber,
-  normalizeAuthIndex
+  normalizeAuthIndex,
+  normalizeUsageSourceId,
 } from '@/utils/usage';
 import { authFilesApi } from '@/services/api/authFiles';
+import type { UsageCredentialItem } from '@/services/api/usage';
 import type { GeminiKeyConfig, ProviderKeyConfig, OpenAIProviderConfig } from '@/types';
 import type { AuthFileItem } from '@/types/authFile';
 import type { CredentialInfo } from '@/types/sourceInfo';
@@ -23,6 +25,8 @@ export interface CredentialStatsCardProps {
   codexConfigs: ProviderKeyConfig[];
   vertexConfigs: ProviderKeyConfig[];
   openaiProviders: OpenAIProviderConfig[];
+  sqliteCredentials?: UsageCredentialItem[] | null;
+  isSqliteUsage?: boolean;
 }
 
 interface CredentialRow {
@@ -48,6 +52,8 @@ export function CredentialStatsCard({
   codexConfigs,
   vertexConfigs,
   openaiProviders,
+  sqliteCredentials,
+  isSqliteUsage = false,
 }: CredentialStatsCardProps) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(true);
@@ -82,8 +88,6 @@ export function CredentialStatsCard({
   // Aggregate rows: all from bySource only (no separate byAuthIndex rows to avoid duplicates).
   // Auth files are used purely for name resolution of unmatched source IDs.
   const rows = useMemo((): CredentialRow[] => {
-    if (!usage) return [];
-    const details = collectUsageDetails(usage);
     const bySource: Record<string, CredentialBucket> = {};
     const result: CredentialRow[] = [];
     const consumedSourceIds = new Set<string>();
@@ -92,39 +96,73 @@ export function CredentialStatsCard({
     const sourceToAuthFile = new Map<string, CredentialInfo>();
     const fallbackByAuthIndex = new Map<string, CredentialBucket>();
 
-    details.forEach((detail) => {
-      const authIdx = normalizeAuthIndex(detail.auth_index);
-      const source = detail.source;
-      const isFailed = detail.failed === true;
+    if (isSqliteUsage) {
+      (sqliteCredentials ?? []).forEach((item) => {
+        const authIdx = normalizeAuthIndex(item.auth_index);
+        const source = normalizeUsageSourceId(item.source);
+        const success = typeof item.success === 'number' ? item.success : Number(item.success) || 0;
+        const failure = typeof item.failure === 'number' ? item.failure : Number(item.failure) || 0;
 
-      if (!source) {
-        if (!authIdx) return;
-        const fallback = fallbackByAuthIndex.get(authIdx) ?? { success: 0, failure: 0 };
-        if (isFailed) {
-          fallback.failure += 1;
-        } else {
-          fallback.success += 1;
+        if (!source) {
+          if (!authIdx) return;
+          const fallback = fallbackByAuthIndex.get(authIdx) ?? { success: 0, failure: 0 };
+          fallback.success += success;
+          fallback.failure += failure;
+          fallbackByAuthIndex.set(authIdx, fallback);
+          return;
         }
-        fallbackByAuthIndex.set(authIdx, fallback);
-        return;
-      }
 
-      const bucket = bySource[source] ?? { success: 0, failure: 0 };
-      if (isFailed) {
-        bucket.failure += 1;
-      } else {
-        bucket.success += 1;
-      }
-      bySource[source] = bucket;
+        const bucket = bySource[source] ?? { success: 0, failure: 0 };
+        bucket.success += success;
+        bucket.failure += failure;
+        bySource[source] = bucket;
 
-      if (authIdx && !sourceToAuthIndex.has(source)) {
-        sourceToAuthIndex.set(source, authIdx);
-      }
-      if (authIdx && !sourceToAuthFile.has(source)) {
-        const mapped = authFileMap.get(authIdx);
-        if (mapped) sourceToAuthFile.set(source, mapped);
-      }
-    });
+        if (authIdx && !sourceToAuthIndex.has(source)) {
+          sourceToAuthIndex.set(source, authIdx);
+        }
+        if (authIdx && !sourceToAuthFile.has(source)) {
+          const mapped = authFileMap.get(authIdx);
+          if (mapped) sourceToAuthFile.set(source, mapped);
+        }
+      });
+    } else {
+      if (!usage) return [];
+      const details = collectUsageDetails(usage);
+
+      details.forEach((detail) => {
+        const authIdx = normalizeAuthIndex(detail.auth_index);
+        const source = detail.source;
+        const isFailed = detail.failed === true;
+
+        if (!source) {
+          if (!authIdx) return;
+          const fallback = fallbackByAuthIndex.get(authIdx) ?? { success: 0, failure: 0 };
+          if (isFailed) {
+            fallback.failure += 1;
+          } else {
+            fallback.success += 1;
+          }
+          fallbackByAuthIndex.set(authIdx, fallback);
+          return;
+        }
+
+        const bucket = bySource[source] ?? { success: 0, failure: 0 };
+        if (isFailed) {
+          bucket.failure += 1;
+        } else {
+          bucket.success += 1;
+        }
+        bySource[source] = bucket;
+
+        if (authIdx && !sourceToAuthIndex.has(source)) {
+          sourceToAuthIndex.set(source, authIdx);
+        }
+        if (authIdx && !sourceToAuthFile.has(source)) {
+          const mapped = authFileMap.get(authIdx);
+          if (mapped) sourceToAuthFile.set(source, mapped);
+        }
+      });
+    }
 
     const mergeBucketToRow = (index: number, bucket: CredentialBucket) => {
       const target = result[index];
@@ -269,7 +307,17 @@ export function CredentialStatsCard({
     });
 
     return result.sort((a, b) => b.total - a.total);
-  }, [usage, geminiKeys, claudeConfigs, codexConfigs, vertexConfigs, openaiProviders, authFileMap]);
+  }, [
+    usage,
+    sqliteCredentials,
+    isSqliteUsage,
+    geminiKeys,
+    claudeConfigs,
+    codexConfigs,
+    vertexConfigs,
+    openaiProviders,
+    authFileMap,
+  ]);
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => !prev);

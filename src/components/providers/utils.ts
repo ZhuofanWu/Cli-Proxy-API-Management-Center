@@ -1,5 +1,9 @@
 import type { AmpcodeConfig, AmpcodeModelMapping, AmpcodeUpstreamApiKeyMapping, ApiKeyEntry } from '@/types';
-import { buildCandidateUsageSourceIds, type KeyStatBucket, type KeyStats } from '@/utils/usage';
+import {
+  createEmptyCredentialStatusBarData,
+  mergeStatusBarData,
+} from '@/utils/credentialUsage';
+import { buildCandidateUsageSourceIds, type KeyStatBucket, type KeyStats, type StatusBarData } from '@/utils/usage';
 import type { AmpcodeFormState, AmpcodeUpstreamApiKeyEntry, ModelEntry } from './types';
 
 export const DISABLE_ALL_MODELS_RULE = '*';
@@ -133,6 +137,25 @@ export const getOpenAIProviderStats = (
   });
 
   return { success, failure };
+};
+
+export const getStatusBarBySourceIds = (
+  sourceIds: Iterable<string>,
+  sourceStatusMap?: Map<string, StatusBarData>
+): StatusBarData => {
+  if (!sourceStatusMap || sourceStatusMap.size === 0) {
+    return createEmptyCredentialStatusBarData();
+  }
+
+  const matches: StatusBarData[] = [];
+  for (const sourceId of sourceIds) {
+    const statusData = sourceStatusMap.get(sourceId);
+    if (statusData) {
+      matches.push(statusData);
+    }
+  }
+
+  return matches.length ? mergeStatusBarData(matches) : createEmptyCredentialStatusBarData();
 };
 
 export const buildApiKeyEntry = (input?: Partial<ApiKeyEntry>): ApiKeyEntry => ({

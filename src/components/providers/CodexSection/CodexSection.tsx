@@ -11,17 +11,19 @@ import {
   buildCandidateUsageSourceIds,
   calculateStatusBarData,
   type KeyStats,
+  type StatusBarData,
   type UsageDetail,
 } from '@/utils/usage';
 import styles from '@/pages/AiProvidersPage.module.scss';
 import { ProviderList } from '../ProviderList';
 import { ProviderStatusBar } from '../ProviderStatusBar';
-import { getStatsBySource, hasDisableAllModelsRule } from '../utils';
+import { getStatsBySource, getStatusBarBySourceIds, hasDisableAllModelsRule } from '../utils';
 
 interface CodexSectionProps {
   configs: ProviderKeyConfig[];
   keyStats: KeyStats;
   usageDetails: UsageDetail[];
+  sourceStatusMap: Map<string, StatusBarData>;
   loading: boolean;
   disableControls: boolean;
   isSwitching: boolean;
@@ -36,6 +38,7 @@ export function CodexSection({
   configs,
   keyStats,
   usageDetails,
+  sourceStatusMap,
   loading,
   disableControls,
   isSwitching,
@@ -59,13 +62,17 @@ export function CodexSection({
         prefix: config.prefix,
       });
       if (!candidates.length) return;
+      if (sourceStatusMap.size > 0) {
+        cache.set(config.apiKey, getStatusBarBySourceIds(candidates, sourceStatusMap));
+        return;
+      }
       const candidateSet = new Set(candidates);
       const filteredDetails = usageDetails.filter((detail) => candidateSet.has(detail.source));
       cache.set(config.apiKey, calculateStatusBarData(filteredDetails));
     });
 
     return cache;
-  }, [configs, usageDetails]);
+  }, [configs, sourceStatusMap, usageDetails]);
 
   return (
     <>

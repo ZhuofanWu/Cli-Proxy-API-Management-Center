@@ -1,26 +1,52 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useUsageCredentialsData } from '@/hooks/useUsageCredentialsData';
 import { useInterval } from '@/hooks/useInterval';
 import { USAGE_STATS_STALE_TIME_MS, useUsageStatsStore } from '@/stores';
+import { buildCredentialUsageIndex } from '@/utils/credentialUsage';
+import type { StatusBarData } from '@/utils/usage';
 
-export const useProviderStats = () => {
-  const keyStats = useUsageStatsStore((state) => state.keyStats);
-  const usageDetails = useUsageStatsStore((state) => state.usageDetails);
-  const isLoading = useUsageStatsStore((state) => state.loading);
+export const useProviderStats = (isSqliteUsage: boolean) => {
+  const memoryKeyStats = useUsageStatsStore((state) => state.keyStats);
+  const memoryUsageDetails = useUsageStatsStore((state) => state.usageDetails);
+  const memoryLoading = useUsageStatsStore((state) => state.loading);
   const loadUsageStats = useUsageStatsStore((state) => state.loadUsageStats);
+  const { snapshot, loading: sqliteLoading, loadUsageCredentials } = useUsageCredentialsData(
+    'all',
+    isSqliteUsage,
+    true
+  );
+  const sqliteIndex = useMemo(
+    () => buildCredentialUsageIndex(snapshot?.credentials ?? []),
+    [snapshot?.credentials]
+  );
+  const emptyStatusMap = useMemo(() => new Map<string, StatusBarData>(), []);
 
-  // 首次进入页面优先复用缓存，避免跨页面重复拉取 /usage。
   const loadKeyStats = useCallback(async () => {
+    if (isSqliteUsage) {
+      await loadUsageCredentials();
+      return;
+    }
     await loadUsageStats({ staleTimeMs: USAGE_STATS_STALE_TIME_MS });
-  }, [loadUsageStats]);
+  }, [isSqliteUsage, loadUsageCredentials, loadUsageStats]);
 
-  // 定时器触发时强制刷新共享 usage。
   const refreshKeyStats = useCallback(async () => {
+    if (isSqliteUsage) {
+      await loadUsageCredentials();
+      return;
+    }
     await loadUsageStats({ force: true, staleTimeMs: USAGE_STATS_STALE_TIME_MS });
-  }, [loadUsageStats]);
+  }, [isSqliteUsage, loadUsageCredentials, loadUsageStats]);
 
   useInterval(() => {
     void refreshKeyStats().catch(() => {});
   }, 240_000);
 
-  return { keyStats, usageDetails, loadKeyStats, refreshKeyStats, isLoading };
+  return {
+    keyStats: isSqliteUsage ? sqliteIndex.keyStats : memoryKeyStats,
+    usageDetails: isSqliteUsage ? [] : memoryUsageDetails,
+    sourceStatusMap: isSqliteUsage ? sqliteIndex.sourceStatusMap : emptyStatusMap,
+    loadKeyStats,
+    refreshKeyStats,
+    isLoading: isSqliteUsage ? sqliteLoading : memoryLoading,
+  };
 };

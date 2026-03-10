@@ -47,7 +47,7 @@ import { useAuthFilesPrefixProxyEditor } from '@/features/authFiles/hooks/useAut
 import { useAuthFilesStats } from '@/features/authFiles/hooks/useAuthFilesStats';
 import { useAuthFilesStatusBarCache } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
 import { readAuthFilesUiState, writeAuthFilesUiState } from '@/features/authFiles/uiState';
-import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
+import { useAuthStore, useConfigStore, useNotificationStore, useThemeStore } from '@/stores';
 import type { AuthFileItem } from '@/types';
 import styles from './AuthFilesPage.module.scss';
 
@@ -61,6 +61,7 @@ export function AuthFilesPage() {
   const showNotification = useNotificationStore((state) => state.showNotification);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
+  const isSqliteUsage = useConfigStore((state) => state.config?.usageStatisticsStorageWay === 'sqlite');
   const pageTransitionLayer = usePageTransitionLayer();
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
   const navigate = useNavigate();
@@ -80,7 +81,8 @@ export function AuthFilesPage() {
   const previousSelectionCountRef = useRef(0);
   const selectionCountRef = useRef(0);
 
-  const { keyStats, usageDetails, loadKeyStats, refreshKeyStats } = useAuthFilesStats();
+  const { keyStats, usageDetails, authIndexStatusMap, loadKeyStats, refreshKeyStats } =
+    useAuthFilesStats(isSqliteUsage);
   const {
     files,
     selectedFiles,
@@ -106,7 +108,7 @@ export function AuthFilesPage() {
     batchDelete,
   } = useAuthFilesData({ refreshKeyStats });
 
-  const statusBarCache = useAuthFilesStatusBarCache(files, usageDetails);
+  const statusBarCache = useAuthFilesStatusBarCache(files, usageDetails, authIndexStatusMap);
 
   const {
     excluded,
@@ -232,10 +234,12 @@ export function AuthFilesPage() {
   useEffect(() => {
     if (!isCurrentLayer) return;
     loadFiles();
-    void loadKeyStats().catch(() => {});
+    if (!isSqliteUsage) {
+      void loadKeyStats().catch(() => {});
+    }
     loadExcluded();
     loadModelAlias();
-  }, [isCurrentLayer, loadFiles, loadKeyStats, loadExcluded, loadModelAlias]);
+  }, [isCurrentLayer, isSqliteUsage, loadFiles, loadKeyStats, loadExcluded, loadModelAlias]);
 
   useInterval(
     () => {

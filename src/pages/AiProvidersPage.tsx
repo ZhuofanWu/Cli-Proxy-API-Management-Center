@@ -58,8 +58,10 @@ export function AiProvidersPage() {
 
   const disableControls = connectionStatus !== 'connected';
   const isSwitching = Boolean(configSwitchingKey);
+  const isSqliteUsage = config?.usageStatisticsStorageWay === 'sqlite';
 
-  const { keyStats, usageDetails, loadKeyStats, refreshKeyStats } = useProviderStats();
+  const { keyStats, usageDetails, sourceStatusMap, loadKeyStats, refreshKeyStats } =
+    useProviderStats(isSqliteUsage);
 
   const getErrorMessage = (err: unknown) => {
     if (err instanceof Error) return err.message;
@@ -113,8 +115,10 @@ export function AiProvidersPage() {
     if (hasMounted.current) return;
     hasMounted.current = true;
     loadConfigs();
-    void loadKeyStats().catch(() => {});
-  }, [loadConfigs, loadKeyStats]);
+    if (!isSqliteUsage) {
+      void loadKeyStats().catch(() => {});
+    }
+  }, [isSqliteUsage, loadConfigs, loadKeyStats]);
 
   useEffect(() => {
     if (config?.geminiApiKeys) setGeminiKeys(config.geminiApiKeys);
@@ -348,6 +352,7 @@ export function AiProvidersPage() {
             configs={geminiKeys}
             keyStats={keyStats}
             usageDetails={usageDetails}
+            sourceStatusMap={sourceStatusMap}
             loading={loading}
             disableControls={disableControls}
             isSwitching={isSwitching}
@@ -363,6 +368,7 @@ export function AiProvidersPage() {
             configs={codexConfigs}
             keyStats={keyStats}
             usageDetails={usageDetails}
+            sourceStatusMap={sourceStatusMap}
             loading={loading}
             disableControls={disableControls}
             isSwitching={isSwitching}
@@ -379,6 +385,7 @@ export function AiProvidersPage() {
             configs={claudeConfigs}
             keyStats={keyStats}
             usageDetails={usageDetails}
+            sourceStatusMap={sourceStatusMap}
             loading={loading}
             disableControls={disableControls}
             isSwitching={isSwitching}
@@ -394,6 +401,7 @@ export function AiProvidersPage() {
             configs={vertexConfigs}
             keyStats={keyStats}
             usageDetails={usageDetails}
+            sourceStatusMap={sourceStatusMap}
             loading={loading}
             disableControls={disableControls}
             isSwitching={isSwitching}
@@ -418,6 +426,7 @@ export function AiProvidersPage() {
             configs={openaiProviders}
             keyStats={keyStats}
             usageDetails={usageDetails}
+            sourceStatusMap={sourceStatusMap}
             loading={loading}
             disableControls={disableControls}
             isSwitching={isSwitching}

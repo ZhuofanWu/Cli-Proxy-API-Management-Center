@@ -69,6 +69,24 @@ export interface UsageHealthPayload {
   total_failure?: number;
 }
 
+export type UsageCredentialHealthPayload = UsageHealthPayload;
+
+export interface UsageCredentialItem {
+  source?: string;
+  auth_index?: string;
+  success?: number;
+  failure?: number;
+  total?: number;
+  success_rate?: number;
+  health?: UsageCredentialHealthPayload | null;
+}
+
+export interface UsageCredentialsPayload {
+  range?: UsageTimeRange;
+  percentdata?: boolean;
+  credentials?: UsageCredentialItem[];
+}
+
 export interface UsageRankingsApiModelItem {
   model_name?: string;
   requests?: number;
@@ -153,6 +171,12 @@ export const usageApi = {
   getUsageHealth: () =>
     apiClient.get<UsageHealthPayload>('/usage/health', {
       timeout: USAGE_TIMEOUT_MS,
+    }),
+
+  getUsageCredentials: (range: UsageTimeRange = 'all', percentdata = false) =>
+    apiClient.get<UsageCredentialsPayload>('/usage/credentials', {
+      timeout: USAGE_TIMEOUT_MS,
+      params: { range, percentdata },
     }),
 
   getUsageRankings: (range: UsageTimeRange = 'all') =>

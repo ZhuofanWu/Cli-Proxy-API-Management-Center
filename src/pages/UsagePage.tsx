@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Select } from '@/components/ui/Select';
+import { useUsageCredentialsData } from '@/hooks/useUsageCredentialsData';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useThemeStore, useConfigStore } from '@/stores';
@@ -176,6 +177,14 @@ export function UsagePage() {
   } = useUsageHealthData(isSqliteUsage);
 
   const {
+    snapshot: credentialsSnapshot,
+    loading: credentialsLoading,
+    error: credentialsError,
+    lastRefreshedAt: credentialsLastRefreshedAt,
+    loadUsageCredentials,
+  } = useUsageCredentialsData(timeRange, isSqliteUsage, false);
+
+  const {
     apiStats: sqliteApiStats,
     modelStats: sqliteModelStats,
     loading: rankingsLoading,
@@ -216,6 +225,7 @@ export function UsagePage() {
         loadUsage(),
         loadUsageGeneral(),
         loadUsageHealth(),
+        loadUsageCredentials(),
         loadUsageRankings(),
         loadUsageTokenBreakdown(),
         loadUsageCostTrend(),
@@ -228,6 +238,7 @@ export function UsagePage() {
     loadUsage,
     loadUsageGeneral,
     loadUsageHealth,
+    loadUsageCredentials,
     loadUsageRankings,
     loadUsageTokenBreakdown,
     loadUsageCostTrend,
@@ -309,6 +320,7 @@ export function UsagePage() {
     ? (generalLastRefreshedAt ??
       rankingsLastRefreshedAt ??
       healthLastRefreshedAt ??
+      credentialsLastRefreshedAt ??
       tokenBreakdownLastRefreshedAt ??
       costTrendLastRefreshedAt ??
       lastRefreshedAt)
@@ -348,6 +360,7 @@ export function UsagePage() {
     error,
     generalError,
     healthError,
+    credentialsError,
     rankingsError,
     tokenBreakdownError,
     costTrendError,
@@ -378,6 +391,7 @@ export function UsagePage() {
         await Promise.all([
           loadUsageGeneral().catch(() => {}),
           loadUsageHealth().catch(() => {}),
+          loadUsageCredentials().catch(() => {}),
           loadUsageRankings().catch(() => {}),
           loadUsageTokenBreakdown().catch(() => {}),
           loadUsageCostTrend().catch(() => {}),
@@ -389,6 +403,7 @@ export function UsagePage() {
       isSqliteUsage,
       loadUsageGeneral,
       loadUsageHealth,
+      loadUsageCredentials,
       loadUsageRankings,
       loadUsageTokenBreakdown,
       loadUsageCostTrend,
@@ -635,12 +650,14 @@ export function UsagePage() {
       {/* Credential Stats */}
       <CredentialStatsCard
         usage={usage}
-        loading={loading}
+        loading={isSqliteUsage ? credentialsLoading : loading}
         geminiKeys={config?.geminiApiKeys || []}
         claudeConfigs={config?.claudeApiKeys || []}
         codexConfigs={config?.codexApiKeys || []}
         vertexConfigs={config?.vertexApiKeys || []}
         openaiProviders={config?.openaiCompatibility || []}
+        sqliteCredentials={isSqliteUsage ? credentialsSnapshot?.credentials ?? [] : null}
+        isSqliteUsage={isSqliteUsage}
       />
     </div>
   );

@@ -11,17 +11,19 @@ import {
   buildCandidateUsageSourceIds,
   calculateStatusBarData,
   type KeyStats,
+  type StatusBarData,
   type UsageDetail,
 } from '@/utils/usage';
 import styles from '@/pages/AiProvidersPage.module.scss';
 import { ProviderList } from '../ProviderList';
 import { ProviderStatusBar } from '../ProviderStatusBar';
-import { getOpenAIProviderStats, getStatsBySource } from '../utils';
+import { getOpenAIProviderStats, getStatsBySource, getStatusBarBySourceIds } from '../utils';
 
 interface OpenAISectionProps {
   configs: OpenAIProviderConfig[];
   keyStats: KeyStats;
   usageDetails: UsageDetail[];
+  sourceStatusMap: Map<string, StatusBarData>;
   loading: boolean;
   disableControls: boolean;
   isSwitching: boolean;
@@ -35,6 +37,7 @@ export function OpenAISection({
   configs,
   keyStats,
   usageDetails,
+  sourceStatusMap,
   loading,
   disableControls,
   isSwitching,
@@ -56,6 +59,11 @@ export function OpenAISection({
         buildCandidateUsageSourceIds({ apiKey: entry.apiKey }).forEach((id) => sourceIds.add(id));
       });
 
+      if (sourceStatusMap.size > 0) {
+        cache.set(provider.name, getStatusBarBySourceIds(sourceIds, sourceStatusMap));
+        return;
+      }
+
       const filteredDetails = sourceIds.size
         ? usageDetails.filter((detail) => sourceIds.has(detail.source))
         : [];
@@ -63,7 +71,7 @@ export function OpenAISection({
     });
 
     return cache;
-  }, [configs, usageDetails]);
+  }, [configs, sourceStatusMap, usageDetails]);
 
   return (
     <>
