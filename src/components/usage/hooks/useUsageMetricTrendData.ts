@@ -23,6 +23,7 @@ export function useUsageMetricTrendData(
   metric: UsageTrendMetric,
   granularity: UsageChartGranularity,
   timeRange: UsageTimeRange,
+  offset: number,
   models: string[],
   enabled: boolean
 ): UseUsageMetricTrendDataReturn {
@@ -45,8 +46,8 @@ export function useUsageMetricTrendData(
     try {
       const response =
         metric === 'tokens'
-          ? await usageApi.getUsageTokenTrend(granularity, timeRange, models)
-          : await usageApi.getUsageRequestTrend(granularity, timeRange, models);
+          ? await usageApi.getUsageTokenTrend(granularity, timeRange, offset, models)
+          : await usageApi.getUsageRequestTrend(granularity, timeRange, offset, models);
       setTrend(response ?? null);
       setError('');
       setLastRefreshedAt(new Date());
@@ -57,7 +58,7 @@ export function useUsageMetricTrendData(
     } finally {
       setLoading(false);
     }
-  }, [enabled, granularity, metric, models, t, timeRange]);
+  }, [enabled, granularity, metric, models, offset, t, timeRange]);
 
   useEffect(() => {
     if (!enabled) {

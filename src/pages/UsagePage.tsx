@@ -72,6 +72,7 @@ const TIME_RANGE_STORAGE_KEY = 'cli-proxy-usage-time-range-v1';
 const DEFAULT_CHART_LINES = ['all'];
 const DEFAULT_TIME_RANGE: UsageTimeRange = '24h';
 const MAX_CHART_LINES = 9;
+const TREND_PAGE_DAYS = 15;
 const TOKEN_BREAKDOWN_PAGE_DAYS = 30;
 const TIME_RANGE_OPTIONS: ReadonlyArray<{ value: UsageTimeRange; labelKey: string }> = [
   { value: 'all', labelKey: 'usage_stats.range_all' },
@@ -143,7 +144,9 @@ export function UsagePage() {
   const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
   const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
   const [requestsPeriod, setRequestsPeriod] = useState<UsageChartGranularity>('day');
+  const [requestsTrendOffset, setRequestsTrendOffset] = useState(0);
   const [tokensPeriod, setTokensPeriod] = useState<UsageChartGranularity>('day');
+  const [tokensTrendOffset, setTokensTrendOffset] = useState(0);
   const [tokenBreakdownPeriod, setTokenBreakdownPeriod] =
     useState<UsageTokenBreakdownGranularity>('hour');
   const [tokenBreakdownOffset, setTokenBreakdownOffset] = useState(0);
@@ -212,7 +215,14 @@ export function UsagePage() {
     error: requestsTrendError,
     lastRefreshedAt: requestsTrendLastRefreshedAt,
     loadUsageMetricTrend: loadUsageRequestTrend,
-  } = useUsageMetricTrendData('requests', requestsPeriod, timeRange, chartLines, isSqliteUsage);
+  } = useUsageMetricTrendData(
+    'requests',
+    requestsPeriod,
+    timeRange,
+    requestsTrendOffset,
+    chartLines,
+    isSqliteUsage
+  );
 
   const {
     trend: tokensTrend,
@@ -220,7 +230,14 @@ export function UsagePage() {
     error: tokensTrendError,
     lastRefreshedAt: tokensTrendLastRefreshedAt,
     loadUsageMetricTrend: loadUsageTokenTrend,
-  } = useUsageMetricTrendData('tokens', tokensPeriod, timeRange, chartLines, isSqliteUsage);
+  } = useUsageMetricTrendData(
+    'tokens',
+    tokensPeriod,
+    timeRange,
+    tokensTrendOffset,
+    chartLines,
+    isSqliteUsage
+  );
 
   const {
     tokenBreakdown,
@@ -298,6 +315,12 @@ export function UsagePage() {
   const handleTimeRangeChange = useCallback(
     (value: UsageTimeRange) => {
       setTimeRange(value);
+      if (value !== 'all' || requestsPeriod !== 'day') {
+        setRequestsTrendOffset(0);
+      }
+      if (value !== 'all' || tokensPeriod !== 'day') {
+        setTokensTrendOffset(0);
+      }
       if (value !== 'all' || tokenBreakdownPeriod !== 'day') {
         setTokenBreakdownOffset(0);
       }
@@ -305,7 +328,27 @@ export function UsagePage() {
         setCostTrendOffset(0);
       }
     },
-    [costTrendPeriod, tokenBreakdownPeriod]
+    [costTrendPeriod, requestsPeriod, tokenBreakdownPeriod, tokensPeriod]
+  );
+
+  const handleRequestsPeriodChange = useCallback(
+    (value: UsageChartGranularity) => {
+      setRequestsPeriod(value);
+      if (value !== 'day' || timeRange !== 'all') {
+        setRequestsTrendOffset(0);
+      }
+    },
+    [timeRange]
+  );
+
+  const handleTokensPeriodChange = useCallback(
+    (value: UsageChartGranularity) => {
+      setTokensPeriod(value);
+      if (value !== 'day' || timeRange !== 'all') {
+        setTokensTrendOffset(0);
+      }
+    },
+    [timeRange]
   );
 
   const handleTokenBreakdownPeriodChange = useCallback(
@@ -413,6 +456,15 @@ export function UsagePage() {
   const canPageToOlderTokenBreakdown =
     tokenBreakdownPagingEnabled && Boolean(tokenBreakdown?.has_older);
   const canPageToNewerTokenBreakdown = tokenBreakdownPagingEnabled && tokenBreakdownOffset > 0;
+  const requestsTrendPagingEnabled = isSqliteUsage && requestsPeriod === 'day' && timeRange === 'all';
+  const canPageToOlderRequestsTrend =
+    requestsTrendPagingEnabled && Boolean(requestsTrend?.has_older);
+  const canPageToNewerRequestsTrend =
+    requestsTrendPagingEnabled && requestsTrendOffset > 0;
+  const tokensTrendPagingEnabled = isSqliteUsage && tokensPeriod === 'day' && timeRange === 'all';
+  const canPageToOlderTokensTrend =
+    tokensTrendPagingEnabled && Boolean(tokensTrend?.has_older);
+  const canPageToNewerTokensTrend = tokensTrendPagingEnabled && tokensTrendOffset > 0;
   const costTrendCardLoading = isSqliteUsage && hasPrices ? costTrendLoading : loading;
   const detailsCardLoading = isSqliteUsage ? rankingsLoading : loading;
   const requestsChartLoading = isSqliteUsage ? requestsTrendLoading : loading;
@@ -470,6 +522,34 @@ export function UsagePage() {
     }
     setTokenBreakdownOffset((prev) => Math.max(prev - TOKEN_BREAKDOWN_PAGE_DAYS, 0));
   }, [canPageToNewerTokenBreakdown]);
+
+  const handleRequestsTrendPageToOlder = useCallback(() => {
+    if (!canPageToOlderRequestsTrend) {
+      return;
+    }
+    setRequestsTrendOffset((prev) => prev + TREND_PAGE_DAYS);
+  }, [canPageToOlderRequestsTrend]);
+
+  const handleRequestsTrendPageToNewer = useCallback(() => {
+    if (!canPageToNewerRequestsTrend) {
+      return;
+    }
+    setRequestsTrendOffset((prev) => Math.max(prev - TREND_PAGE_DAYS, 0));
+  }, [canPageToNewerRequestsTrend]);
+
+  const handleTokensTrendPageToOlder = useCallback(() => {
+    if (!canPageToOlderTokensTrend) {
+      return;
+    }
+    setTokensTrendOffset((prev) => prev + TREND_PAGE_DAYS);
+  }, [canPageToOlderTokensTrend]);
+
+  const handleTokensTrendPageToNewer = useCallback(() => {
+    if (!canPageToNewerTokensTrend) {
+      return;
+    }
+    setTokensTrendOffset((prev) => Math.max(prev - TREND_PAGE_DAYS, 0));
+  }, [canPageToNewerTokensTrend]);
 
   const handleCostTrendPageToOlder = useCallback(() => {
     if (!canPageToOlderCostTrend) {
@@ -636,22 +716,32 @@ export function UsagePage() {
         <UsageChart
           title={t('usage_stats.requests_trend')}
           period={requestsPeriod}
-          onPeriodChange={setRequestsPeriod}
+          onPeriodChange={handleRequestsPeriodChange}
           chartData={requestsChartData}
           chartOptions={requestsChartOptions}
           loading={requestsChartLoading}
           isMobile={isMobile}
           emptyText={t('usage_stats.no_data')}
+          showPagination={requestsTrendPagingEnabled}
+          canPageBackward={canPageToOlderRequestsTrend}
+          canPageForward={canPageToNewerRequestsTrend}
+          onPageBackward={handleRequestsTrendPageToOlder}
+          onPageForward={handleRequestsTrendPageToNewer}
         />
         <UsageChart
           title={t('usage_stats.tokens_trend')}
           period={tokensPeriod}
-          onPeriodChange={setTokensPeriod}
+          onPeriodChange={handleTokensPeriodChange}
           chartData={tokensChartData}
           chartOptions={tokensChartOptions}
           loading={tokensChartLoading}
           isMobile={isMobile}
           emptyText={t('usage_stats.no_data')}
+          showPagination={tokensTrendPagingEnabled}
+          canPageBackward={canPageToOlderTokensTrend}
+          canPageForward={canPageToNewerTokensTrend}
+          onPageBackward={handleTokensTrendPageToOlder}
+          onPageForward={handleTokensTrendPageToNewer}
         />
       </div>
 

@@ -192,6 +192,8 @@ export interface UsageMetricTrendPayload {
   metric?: string;
   granularity?: UsageChartGranularity;
   range?: UsageTimeRange;
+  offset?: number;
+  has_older?: boolean;
   labels?: string[];
   series?: UsageMetricTrendSeries[];
 }
@@ -210,11 +212,13 @@ export interface UsageTrendModelsPayload {
 const buildTrendQueryParams = (
   granularity: UsageChartGranularity,
   range: UsageTimeRange,
+  offset: number,
   models: string[]
 ) => {
   const params = new URLSearchParams();
   params.set('granularity', granularity);
   params.set('range', range);
+  params.set('offset', String(Math.max(offset, 0)));
   models.forEach((model) => {
     const trimmed = model.trim();
     if (trimmed) {
@@ -309,21 +313,23 @@ export const usageApi = {
   getUsageRequestTrend: (
     granularity: UsageChartGranularity,
     range: UsageTimeRange = 'all',
+    offset = 0,
     models: string[] = []
   ) =>
     apiClient.get<UsageMetricTrendPayload>('/usage/request-trend', {
       timeout: USAGE_TIMEOUT_MS,
-      params: buildTrendQueryParams(granularity, range, models),
+      params: buildTrendQueryParams(granularity, range, offset, models),
     }),
 
   getUsageTokenTrend: (
     granularity: UsageChartGranularity,
     range: UsageTimeRange = 'all',
+    offset = 0,
     models: string[] = []
   ) =>
     apiClient.get<UsageMetricTrendPayload>('/usage/token-trend', {
       timeout: USAGE_TIMEOUT_MS,
-      params: buildTrendQueryParams(granularity, range, models),
+      params: buildTrendQueryParams(granularity, range, offset, models),
     }),
 
   getUsageModels: (range: UsageTimeRange = 'all') =>
