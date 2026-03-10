@@ -87,6 +87,36 @@ export interface UsageCredentialsPayload {
   credentials?: UsageCredentialItem[];
 }
 
+export type UsageEventResultFilter = 'all' | 'success' | 'failure';
+
+export interface UsageEventTokens {
+  input_tokens?: number;
+  output_tokens?: number;
+  reasoning_tokens?: number;
+  cached_tokens?: number;
+  total_tokens?: number;
+}
+
+export interface UsageEventItem {
+  api_name?: string;
+  model_name?: string;
+  timestamp?: string;
+  source?: string;
+  auth_index?: string;
+  failed?: boolean;
+  tokens?: UsageEventTokens;
+}
+
+export interface UsageEventsPayload {
+  page?: number;
+  page_size?: number;
+  total?: number;
+  total_pages?: number;
+  has_prev?: boolean;
+  has_next?: boolean;
+  items?: UsageEventItem[];
+}
+
 export interface UsageRankingsApiModelItem {
   model_name?: string;
   requests?: number;
@@ -177,6 +207,35 @@ export const usageApi = {
     apiClient.get<UsageCredentialsPayload>('/usage/credentials', {
       timeout: USAGE_TIMEOUT_MS,
       params: { range, percentdata },
+    }),
+
+  getUsageEvents: (
+    range: UsageTimeRange = 'all',
+    page = 1,
+    pageSize = 100,
+    filters: {
+      model?: string;
+      source?: string;
+      authIndex?: string;
+      result?: UsageEventResultFilter;
+    } = {}
+  ) =>
+    apiClient.get<UsageEventsPayload>('/usage/events', {
+      timeout: USAGE_TIMEOUT_MS,
+      params: {
+        range,
+        page,
+        page_size: pageSize,
+        model: filters.model,
+        source: filters.source,
+        auth_index: filters.authIndex,
+        success:
+          filters.result === 'success'
+            ? true
+            : filters.result === 'failure'
+              ? false
+              : undefined,
+      },
     }),
 
   getUsageRankings: (range: UsageTimeRange = 'all') =>

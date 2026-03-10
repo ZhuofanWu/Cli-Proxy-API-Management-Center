@@ -985,6 +985,7 @@
     "request_events_filter_model": "模型",
     "request_events_filter_source": "来源",
     "request_events_filter_auth_index": "认证索引",
+    "request_events_filter_result": "请求结果",
     "request_events_timestamp": "时间",
     "request_events_source": "来源",
     "request_events_auth_index": "认证索引",
@@ -995,6 +996,10 @@
     "request_events_no_result_desc": "请尝试调整筛选条件，或清空当前筛选。",
     "request_events_count": "{{count}} 条事件",
     "request_events_limit_hint": "为保证渲染性能，仅展示 {{shown}} / {{total}} 条事件。",
+    "request_events_memory_limit_hint": "内存模式仅在最近 {{count}} 条事件内筛选。",
+    "request_events_sqlite_lazy_hint": "SQLite 模式按页懒加载，展开后开始获取请求事件。",
+    "request_events_sqlite_collapsed_hint": "当前共有 {{count}} 条事件，展开后按页查看。",
+    "request_events_pagination_info": "第 {{current}} / {{total}} 页 · 共 {{count}} 条事件",
     "input_tokens": "输入 Tokens",
     "output_tokens": "输出 Tokens",
     "last_updated": "更新于"

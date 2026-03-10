@@ -988,6 +988,7 @@
     "request_events_filter_model": "Модель",
     "request_events_filter_source": "Источник",
     "request_events_filter_auth_index": "Auth Index",
+    "request_events_filter_result": "Результат",
     "request_events_timestamp": "Время",
     "request_events_source": "Источник",
     "request_events_auth_index": "Auth Index",
@@ -998,6 +999,10 @@
     "request_events_no_result_desc": "Попробуйте другие фильтры или очистите текущие.",
     "request_events_count": "{{count}} событий",
     "request_events_limit_hint": "Показано {{shown}} из {{total}} событий для стабильной производительности.",
+    "request_events_memory_limit_hint": "В режиме памяти фильтрация идет только по последним {{count}} событиям.",
+    "request_events_sqlite_lazy_hint": "В режиме SQLite события запросов загружаются постранично после раскрытия карточки.",
+    "request_events_sqlite_collapsed_hint": "Доступно {{count}} событий. Разверните карточку для постраничного просмотра.",
+    "request_events_pagination_info": "Страница {{current}} / {{total}} · {{count}} событий",
     "input_tokens": "Входные токены",
     "output_tokens": "Выходные токены",
     "last_updated": "Обновлено"

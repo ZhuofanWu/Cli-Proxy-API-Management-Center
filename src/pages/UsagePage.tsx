@@ -640,6 +640,11 @@ export function UsagePage() {
       <RequestEventsDetailsCard
         usage={usage}
         loading={loading}
+        isSqliteUsage={isSqliteUsage}
+        timeRange={timeRange}
+        refreshSignal={effectiveLastRefreshedAt?.getTime() ?? 0}
+        sqliteCredentials={isSqliteUsage ? credentialsSnapshot?.credentials ?? [] : null}
+        sqliteModelStats={isSqliteUsage ? sqliteModelStats : null}
         geminiKeys={config?.geminiApiKeys || []}
         claudeConfigs={config?.claudeApiKeys || []}
         codexConfigs={config?.codexApiKeys || []}
