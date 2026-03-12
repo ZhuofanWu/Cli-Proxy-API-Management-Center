@@ -232,10 +232,10 @@ export const usageApi = {
   /**
    * 获取使用统计原始数据
    */
-  getUsage: (range: UsageTimeRange = 'all') =>
+  getUsage: (range?: UsageTimeRange) =>
     apiClient.get<Record<string, unknown>>('/usage', {
       timeout: USAGE_TIMEOUT_MS,
-      params: { range },
+      params: range ? { range } : undefined,
     }),
 
   getUsageGeneral: (range: UsageTimeRange = 'all') =>
@@ -338,8 +338,10 @@ export const usageApi = {
       params: { range },
     }),
 
-  getFullUsage: () =>
-    apiClient.get<Record<string, unknown>>('/usage/full', { timeout: USAGE_TIMEOUT_MS }),
+  /**
+   * @deprecated Use getUsage() instead. `/usage/full` will be removed in a future release.
+   */
+  getFullUsage: () => apiClient.get<Record<string, unknown>>('/usage', { timeout: USAGE_TIMEOUT_MS }),
 
   /**
    * 导出使用统计快照
@@ -359,7 +361,7 @@ export const usageApi = {
   async getKeyStats(usageData?: unknown): Promise<KeyStats> {
     let payload = usageData;
     if (!payload) {
-      const response = await apiClient.get<Record<string, unknown>>('/usage/full', {
+      const response = await apiClient.get<Record<string, unknown>>('/usage', {
         timeout: USAGE_TIMEOUT_MS,
       });
       payload = response?.usage ?? response;
