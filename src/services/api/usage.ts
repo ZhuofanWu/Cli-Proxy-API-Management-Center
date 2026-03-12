@@ -339,11 +339,6 @@ export const usageApi = {
     }),
 
   /**
-   * @deprecated Use getUsage() instead. `/usage/full` will be removed in a future release.
-   */
-  getFullUsage: () => apiClient.get<Record<string, unknown>>('/usage', { timeout: USAGE_TIMEOUT_MS }),
-
-  /**
    * 导出使用统计快照
    */
   exportUsage: () =>
