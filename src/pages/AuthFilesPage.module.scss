@@ -405,18 +405,6 @@
   transition: width 0.2s ease;
 }
 
-.quotaBarFillHigh {
-  background-color: var(--success-color, #22c55e);
-}
-
-.quotaBarFillMedium {
-  background-color: var(--warning-color);
-}
-
-.quotaBarFillLow {
-  background-color: var(--danger-color);
-}
-
 .quotaMeta {
   display: flex;
   align-items: center;

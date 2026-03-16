@@ -522,7 +522,7 @@ const renderAntigravityItems = (
           h('span', { className: styleMap.quotaReset }, resetLabel)
         )
       ),
-      h(QuotaProgressBar, { percent, highThreshold: 60, mediumThreshold: 20 })
+      h(QuotaProgressBar, { percent })
     );
   });
 };
@@ -591,7 +591,7 @@ const renderCodexItems = (
             h('span', { className: styleMap.quotaReset }, window.resetLabel)
           )
         ),
-        h(QuotaProgressBar, { percent: remaining, highThreshold: 80, mediumThreshold: 50 })
+        h(QuotaProgressBar, { percent: remaining })
       );
     })
   );
@@ -646,7 +646,7 @@ const renderGeminiCliItems = (
           h('span', { className: styleMap.quotaReset }, resetLabel)
         )
       ),
-      h(QuotaProgressBar, { percent, highThreshold: 60, mediumThreshold: 20 })
+      h(QuotaProgressBar, { percent })
     );
   });
 };
@@ -835,7 +835,7 @@ const renderClaudeItems = (
             h('span', { className: styleMap.quotaReset }, window.resetLabel)
           )
         ),
-        h(QuotaProgressBar, { percent: remaining, highThreshold: 80, mediumThreshold: 50 })
+        h(QuotaProgressBar, { percent: remaining })
       );
     })
   );
@@ -1027,7 +1027,7 @@ const renderKimiItems = (
             : null
         )
       ),
-      h(QuotaProgressBar, { percent: remaining, highThreshold: 60, mediumThreshold: 20 })
+      h(QuotaProgressBar, { percent: remaining })
     );
   });
 };
