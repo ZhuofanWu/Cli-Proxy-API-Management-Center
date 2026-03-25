@@ -51,99 +51,25 @@ function parseApiKeysText(raw: unknown): string {
   return keys.join('\n');
 }
 
-function replaceApiKeyValue(entry: unknown, apiKey: string): unknown {
-  const record = asRecord(entry);
-  if (!record) return apiKey;
+function resolveApiKeysText(parsed: Record<string, unknown>): string {
+  if (Object.prototype.hasOwnProperty.call(parsed, 'api-keys')) {
+    return parseApiKeysText(parsed['api-keys']);
+  }
 
-  if ('api-key' in record) return { ...record, 'api-key': apiKey };
-  if ('apiKey' in record) return { ...record, apiKey };
-  if ('key' in record) return { ...record, key: apiKey };
-  if ('Key' in record) return { ...record, Key: apiKey };
-
-  return { ...record, 'api-key': apiKey };
-}
-
-function buildApiKeyEntries(
-  apiKeys: string[],
-  metadata: ApiKeysStorageMetadata
-): Array<string | Record<string, unknown>> {
-  return apiKeys.map((apiKey, index) => {
-    const originalEntry = metadata.originalEntries[index];
-    if (metadata.entryMode === 'object') {
-      const replaced = replaceApiKeyValue(originalEntry, apiKey);
-      return asRecord(replaced) ?? { 'api-key': apiKey };
-    }
-
-    const record = asRecord(originalEntry);
-    return record ? ({ ...record, ...(replaceApiKeyValue(record, apiKey) as Record<string, unknown>) }) : apiKey;
-  });
-}
-
-function resolveApiKeysStorage(parsed: Record<string, unknown>): {
-  text: string;
-  metadata: ApiKeysStorageMetadata;
-} {
-  const legacyEntries = Array.isArray(parsed['api-keys']) ? parsed['api-keys'] : [];
   const auth = asRecord(parsed.auth);
   const providers = asRecord(auth?.providers);
   const configApiKeyProvider = asRecord(providers?.['config-api-key']);
+  if (!configApiKeyProvider) return '';
 
-  if (configApiKeyProvider) {
-    const providerEntries = Array.isArray(configApiKeyProvider['api-key-entries'])
-      ? configApiKeyProvider['api-key-entries']
-      : Array.isArray(configApiKeyProvider['api-keys'])
-        ? configApiKeyProvider['api-keys']
-        : [];
-    const providerListKey = Array.isArray(configApiKeyProvider['api-key-entries'])
-      ? 'api-key-entries'
-      : 'api-keys';
-
-    return {
-      text: parseApiKeysText(providerEntries),
-      metadata: {
-        source: 'auth-provider',
-        providerListKey,
-        entryMode:
-          providerListKey === 'api-key-entries' || providerEntries.some((entry) => Boolean(asRecord(entry)))
-            ? 'object'
-            : 'string',
-        originalEntries: providerEntries,
-        syncLegacy: legacyEntries.length > 0,
-      },
-    };
+  if (Object.prototype.hasOwnProperty.call(configApiKeyProvider, 'api-key-entries')) {
+    return parseApiKeysText(configApiKeyProvider['api-key-entries']);
   }
 
-  return {
-    text: parseApiKeysText(legacyEntries),
-    metadata: {
-      source: 'legacy',
-      entryMode: legacyEntries.some((entry) => Boolean(asRecord(entry))) ? 'object' : 'string',
-      originalEntries: legacyEntries,
-      syncLegacy: false,
-    },
-  };
+  return parseApiKeysText(configApiKeyProvider['api-keys']);
 }
 
 type YamlDocument = ReturnType<typeof parseDocument>;
 type YamlPath = string[];
-
-type ApiKeysStorageMode = 'legacy' | 'auth-provider';
-type ApiKeysEntryMode = 'string' | 'object';
-
-type ApiKeysStorageMetadata = {
-  source: ApiKeysStorageMode;
-  providerListKey?: 'api-keys' | 'api-key-entries';
-  entryMode: ApiKeysEntryMode;
-  originalEntries: unknown[];
-  syncLegacy: boolean;
-};
-
-const DEFAULT_API_KEYS_STORAGE_METADATA: ApiKeysStorageMetadata = {
-  source: 'legacy',
-  entryMode: 'string',
-  originalEntries: [],
-  syncLegacy: false,
-};
 
 function docHas(doc: YamlDocument, path: YamlPath): boolean {
   return doc.hasIn(path);
@@ -152,7 +78,8 @@ function docHas(doc: YamlDocument, path: YamlPath): boolean {
 function ensureMapInDoc(doc: YamlDocument, path: YamlPath): void {
   const existing = doc.getIn(path, true);
   if (isMap(existing)) return;
-  doc.setIn(path, {});
+  // Use a YAML node here; plain objects are not treated as collections by subsequent `setIn`.
+  doc.setIn(path, doc.createNode({}));
 }
 
 function deleteIfMapEmpty(doc: YamlDocument, path: YamlPath): void {
@@ -224,6 +151,7 @@ export function getVisualConfigValidationErrors(
     port: getPortError(values.port),
     logsMaxTotalSizeMb: getNonNegativeIntegerError(values.logsMaxTotalSizeMb),
     requestRetry: getNonNegativeIntegerError(values.requestRetry),
+    maxRetryCredentials: getNonNegativeIntegerError(values.maxRetryCredentials),
     maxRetryInterval: getNonNegativeIntegerError(values.maxRetryInterval),
     'streaming.keepaliveSeconds': getNonNegativeIntegerError(values.streaming.keepaliveSeconds),
     'streaming.bootstrapRetries': getNonNegativeIntegerError(values.streaming.bootstrapRetries),
@@ -294,21 +222,32 @@ function parsePayloadParamValue(raw: unknown): { valueType: PayloadParamValueTyp
   return { valueType: 'string', value: String(raw ?? '') };
 }
 
-const PAYLOAD_PROTOCOL_VALUES = [
-  'openai',
-  'openai-response',
-  'gemini',
-  'claude',
-  'codex',
-  'antigravity',
-] as const;
-type PayloadProtocol = (typeof PAYLOAD_PROTOCOL_VALUES)[number];
+function parseRawPayloadParamValue(raw: unknown): string {
+  if (typeof raw === 'string') return raw;
 
-function parsePayloadProtocol(raw: unknown): PayloadProtocol | undefined {
+  try {
+    const json = JSON.stringify(raw, null, 2);
+    return json ?? '';
+  } catch {
+    return String(raw ?? '');
+  }
+}
+
+function parsePayloadProtocol(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined;
-  return PAYLOAD_PROTOCOL_VALUES.includes(raw as PayloadProtocol)
-    ? (raw as PayloadProtocol)
-    : undefined;
+  return raw.trim() ? raw : undefined;
+}
+
+function deleteLegacyApiKeysProvider(doc: YamlDocument): void {
+  if (docHas(doc, ['auth', 'providers', 'config-api-key', 'api-key-entries'])) {
+    doc.deleteIn(['auth', 'providers', 'config-api-key', 'api-key-entries']);
+  }
+  if (docHas(doc, ['auth', 'providers', 'config-api-key', 'api-keys'])) {
+    doc.deleteIn(['auth', 'providers', 'config-api-key', 'api-keys']);
+  }
+  deleteIfMapEmpty(doc, ['auth', 'providers', 'config-api-key']);
+  deleteIfMapEmpty(doc, ['auth', 'providers']);
+  deleteIfMapEmpty(doc, ['auth']);
 }
 
 function parsePayloadRules(rules: unknown): PayloadRule[] {
@@ -377,6 +316,41 @@ function parsePayloadFilterRules(rules: unknown): PayloadFilterRule[] {
   });
 }
 
+function parseRawPayloadRules(rules: unknown): PayloadRule[] {
+  if (!Array.isArray(rules)) return [];
+
+  return rules.map((rule, index) => {
+    const record = asRecord(rule) ?? {};
+
+    const modelsRaw = record.models;
+    const models = Array.isArray(modelsRaw)
+      ? modelsRaw.map((model, modelIndex) => {
+          const modelRecord = asRecord(model);
+          const nameRaw =
+            typeof model === 'string' ? model : (modelRecord?.name ?? modelRecord?.id ?? '');
+          const name = typeof nameRaw === 'string' ? nameRaw : String(nameRaw ?? '');
+          return {
+            id: `raw-model-${index}-${modelIndex}`,
+            name,
+            protocol: parsePayloadProtocol(modelRecord?.protocol),
+          };
+        })
+      : [];
+
+    const paramsRecord = asRecord(record.params);
+    const params = paramsRecord
+      ? Object.entries(paramsRecord).map(([path, value], pIndex) => ({
+          id: `raw-param-${index}-${pIndex}`,
+          path,
+          valueType: 'json' as const,
+          value: parseRawPayloadParamValue(value),
+        }))
+      : [];
+
+    return { id: `payload-raw-rule-${index}`, models, params };
+  });
+}
+
 function serializePayloadRulesForYaml(rules: PayloadRule[]): Array<Record<string, unknown>> {
   return rules
     .map((rule) => {
@@ -434,6 +408,28 @@ function serializePayloadFilterRulesForYaml(
     .filter((rule) => rule.models.length > 0);
 }
 
+function serializeRawPayloadRulesForYaml(rules: PayloadRule[]): Array<Record<string, unknown>> {
+  return rules
+    .map((rule) => {
+      const models = (rule.models || [])
+        .filter((m) => m.name?.trim())
+        .map((m) => {
+          const obj: Record<string, unknown> = { name: m.name.trim() };
+          if (m.protocol) obj.protocol = m.protocol;
+          return obj;
+        });
+
+      const params: Record<string, unknown> = {};
+      for (const param of rule.params || []) {
+        if (!param.path?.trim()) continue;
+        params[param.path.trim()] = param.value;
+      }
+
+      return { models, params };
+    })
+    .filter((rule) => rule.models.length > 0);
+}
+
 export function useVisualConfig() {
   const [visualValues, setVisualValuesState] = useState<VisualConfigValues>({
     ...DEFAULT_VISUAL_VALUES,
@@ -443,8 +439,6 @@ export function useVisualConfig() {
     ...DEFAULT_VISUAL_VALUES,
   });
   const [visualParseError, setVisualParseError] = useState<string | null>(null);
-  const [apiKeysStorageMetadata, setApiKeysStorageMetadata] =
-    useState<ApiKeysStorageMetadata>(DEFAULT_API_KEYS_STORAGE_METADATA);
   const visualValidationErrors = useMemo(
     () => getVisualConfigValidationErrors(visualValues),
     [visualValues]
@@ -452,8 +446,15 @@ export function useVisualConfig() {
   const visualHasPayloadValidationErrors = useMemo(
     () =>
       hasPayloadParamValidationErrors(visualValues.payloadDefaultRules) ||
-      hasPayloadParamValidationErrors(visualValues.payloadOverrideRules),
-    [visualValues.payloadDefaultRules, visualValues.payloadOverrideRules]
+      hasPayloadParamValidationErrors(visualValues.payloadDefaultRawRules) ||
+      hasPayloadParamValidationErrors(visualValues.payloadOverrideRules) ||
+      hasPayloadParamValidationErrors(visualValues.payloadOverrideRawRules),
+    [
+      visualValues.payloadDefaultRules,
+      visualValues.payloadDefaultRawRules,
+      visualValues.payloadOverrideRules,
+      visualValues.payloadOverrideRawRules,
+    ]
   );
 
   const visualDirty = useMemo(() => {
@@ -475,7 +476,6 @@ export function useVisualConfig() {
       const routing = asRecord(parsed.routing);
       const payload = asRecord(parsed.payload);
       const streaming = asRecord(parsed.streaming);
-      const apiKeysStorage = resolveApiKeysStorage(parsed);
 
       const newValues: VisualConfigValues = {
         host: typeof parsed.host === 'string' ? parsed.host : '',
@@ -494,10 +494,10 @@ export function useVisualConfig() {
             ? remoteManagement['panel-github-repository']
             : typeof remoteManagement?.['panel-repo'] === 'string'
               ? remoteManagement['panel-repo']
-              : '',
+            : '',
 
         authDir: typeof parsed['auth-dir'] === 'string' ? parsed['auth-dir'] : '',
-        apiKeysText: apiKeysStorage.text,
+        apiKeysText: resolveApiKeysText(parsed),
 
         debug: Boolean(parsed.debug),
         commercialMode: Boolean(parsed['commercial-mode']),
@@ -513,6 +513,7 @@ export function useVisualConfig() {
         proxyUrl: typeof parsed['proxy-url'] === 'string' ? parsed['proxy-url'] : '',
         forceModelPrefix: Boolean(parsed['force-model-prefix']),
         requestRetry: String(parsed['request-retry'] ?? ''),
+        maxRetryCredentials: String(parsed['max-retry-credentials'] ?? ''),
         maxRetryInterval: String(parsed['max-retry-interval'] ?? ''),
         wsAuth: Boolean(parsed['ws-auth']),
 
@@ -525,7 +526,9 @@ export function useVisualConfig() {
           routing?.strategy === 'fill-first' ? 'fill-first' : 'round-robin',
 
         payloadDefaultRules: parsePayloadRules(payload?.default),
+        payloadDefaultRawRules: parseRawPayloadRules(payload?.['default-raw']),
         payloadOverrideRules: parsePayloadRules(payload?.override),
+        payloadOverrideRawRules: parseRawPayloadRules(payload?.['override-raw']),
         payloadFilterRules: parsePayloadFilterRules(payload?.filter),
 
         streaming: {
@@ -537,7 +540,6 @@ export function useVisualConfig() {
 
       setVisualValuesState(newValues);
       setBaselineValues(deepClone(newValues));
-      setApiKeysStorageMetadata(apiKeysStorage.metadata);
       setVisualParseError(null);
       return { ok: true as const };
     } catch (error: unknown) {
@@ -596,44 +598,16 @@ export function useVisualConfig() {
         }
 
         setStringInDoc(doc, ['auth-dir'], values.authDir);
-        if (values.apiKeysText !== baselineValues.apiKeysText) {
-          const apiKeys = values.apiKeysText
-            .split('\n')
-            .map((key) => key.trim())
-            .filter(Boolean);
-          const apiKeyEntries = buildApiKeyEntries(apiKeys, apiKeysStorageMetadata);
-
-          if (apiKeysStorageMetadata.source === 'auth-provider') {
-            ensureMapInDoc(doc, ['auth']);
-            ensureMapInDoc(doc, ['auth', 'providers']);
-            ensureMapInDoc(doc, ['auth', 'providers', 'config-api-key']);
-
-            const providerListKey = apiKeysStorageMetadata.providerListKey ?? 'api-key-entries';
-            const providerPath = ['auth', 'providers', 'config-api-key', providerListKey];
-
-            if (apiKeys.length > 0) {
-              doc.setIn(providerPath, apiKeyEntries);
-            } else if (docHas(doc, providerPath)) {
-              doc.deleteIn(providerPath);
-            }
-
-            deleteIfMapEmpty(doc, ['auth', 'providers', 'config-api-key']);
-            deleteIfMapEmpty(doc, ['auth', 'providers']);
-            deleteIfMapEmpty(doc, ['auth']);
-
-            if (apiKeysStorageMetadata.syncLegacy) {
-              if (apiKeys.length > 0) {
-                doc.setIn(['api-keys'], apiKeys);
-              } else if (docHas(doc, ['api-keys'])) {
-                doc.deleteIn(['api-keys']);
-              }
-            }
-          } else if (apiKeys.length > 0) {
-            doc.setIn(['api-keys'], apiKeyEntries);
-          } else if (docHas(doc, ['api-keys'])) {
-            doc.deleteIn(['api-keys']);
-          }
+        const apiKeys = values.apiKeysText
+          .split('\n')
+          .map((key) => key.trim())
+          .filter(Boolean);
+        if (apiKeys.length > 0) {
+          doc.setIn(['api-keys'], apiKeys);
+        } else if (docHas(doc, ['api-keys'])) {
+          doc.deleteIn(['api-keys']);
         }
+        deleteLegacyApiKeysProvider(doc);
 
         setBooleanInDoc(doc, ['debug'], values.debug);
 
@@ -652,6 +626,7 @@ export function useVisualConfig() {
         setStringInDoc(doc, ['proxy-url'], values.proxyUrl);
         setBooleanInDoc(doc, ['force-model-prefix'], values.forceModelPrefix);
         setIntFromStringInDoc(doc, ['request-retry'], values.requestRetry);
+        setIntFromStringInDoc(doc, ['max-retry-credentials'], values.maxRetryCredentials);
         setIntFromStringInDoc(doc, ['max-retry-interval'], values.maxRetryInterval);
         setBooleanInDoc(doc, ['ws-auth'], values.wsAuth);
 
@@ -702,7 +677,9 @@ export function useVisualConfig() {
         if (
           docHas(doc, ['payload']) ||
           values.payloadDefaultRules.length > 0 ||
+          values.payloadDefaultRawRules.length > 0 ||
           values.payloadOverrideRules.length > 0 ||
+          values.payloadOverrideRawRules.length > 0 ||
           values.payloadFilterRules.length > 0
         ) {
           ensureMapInDoc(doc, ['payload']);
@@ -714,6 +691,14 @@ export function useVisualConfig() {
           } else if (docHas(doc, ['payload', 'default'])) {
             doc.deleteIn(['payload', 'default']);
           }
+          if (values.payloadDefaultRawRules.length > 0) {
+            doc.setIn(
+              ['payload', 'default-raw'],
+              serializeRawPayloadRulesForYaml(values.payloadDefaultRawRules)
+            );
+          } else if (docHas(doc, ['payload', 'default-raw'])) {
+            doc.deleteIn(['payload', 'default-raw']);
+          }
           if (values.payloadOverrideRules.length > 0) {
             doc.setIn(
               ['payload', 'override'],
@@ -721,6 +706,14 @@ export function useVisualConfig() {
             );
           } else if (docHas(doc, ['payload', 'override'])) {
             doc.deleteIn(['payload', 'override']);
+          }
+          if (values.payloadOverrideRawRules.length > 0) {
+            doc.setIn(
+              ['payload', 'override-raw'],
+              serializeRawPayloadRulesForYaml(values.payloadOverrideRawRules)
+            );
+          } else if (docHas(doc, ['payload', 'override-raw'])) {
+            doc.deleteIn(['payload', 'override-raw']);
           }
           if (values.payloadFilterRules.length > 0) {
             doc.setIn(
@@ -738,7 +731,7 @@ export function useVisualConfig() {
         return currentYaml;
       }
     },
-    [apiKeysStorageMetadata, baselineValues, visualValues]
+    [visualValues]
   );
 
   const setVisualValues = useCallback((newValues: Partial<VisualConfigValues>) => {
