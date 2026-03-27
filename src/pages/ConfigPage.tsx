@@ -6,6 +6,7 @@ import { yaml } from '@codemirror/lang-yaml';
 import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { keymap } from '@codemirror/view';
 import { parse as parseYaml, parseDocument } from 'yaml';
+import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import {
@@ -18,6 +19,7 @@ import {
 import { VisualConfigEditor } from '@/components/config/VisualConfigEditor';
 import { DiffModal } from '@/components/config/DiffModal';
 import { PriceSettingsCard } from '@/components/usage';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useVisualConfig } from '@/hooks/useVisualConfig';
 import { useNotificationStore, useAuthStore, useConfigStore, useThemeStore } from '@/stores';
 import { configApi } from '@/services/api';
@@ -39,12 +41,15 @@ function readCommercialModeFromYaml(yamlContent: string): boolean {
 
 export function ConfigPage() {
   const { t } = useTranslation();
+  const pageTransitionLayer = usePageTransitionLayer();
+  const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
   const showNotification = useNotificationStore((state) => state.showNotification);
   const showConfirmation = useNotificationStore((state) => state.showConfirmation);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const config = useConfigStore((state) => state.config);
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   const {
     visualValues,
@@ -84,6 +89,7 @@ export function ConfigPage() {
 
   const disableControls = connectionStatus !== 'connected';
   const isDirty = dirty || visualDirty;
+  const shouldRenderFloatingActions = isCurrentLayer;
   const hasVisualModeError = !!visualParseError;
   const modelPrices: Record<string, ModelPrice> = config?.modelPrices ?? {};
   const hasVisualValidationErrors =
@@ -92,6 +98,7 @@ export function ConfigPage() {
 
   const refreshConfigStore = useCallback(async () => {
     try {
+      useConfigStore.getState().clearCache();
       await fetchConfig(undefined, true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('notification.refresh_failed');
@@ -149,7 +156,21 @@ export function ConfigPage() {
       setServerYaml(latestContent);
       setMergedYaml(latestContent);
       loadVisualValuesFromYaml(latestContent);
-      await refreshConfigStore();
+      try {
+        useConfigStore.getState().clearCache();
+        await fetchConfig(undefined, true);
+      } catch (refreshError: unknown) {
+        const message =
+          refreshError instanceof Error
+            ? refreshError.message
+            : typeof refreshError === 'string'
+              ? refreshError
+              : '';
+        showNotification(
+          `${t('notification.refresh_failed')}${message ? `: ${message}` : ''}`,
+          'error'
+        );
+      }
       showNotification(t('config_management.save_success'), 'success');
       if (commercialModeChanged) {
         showNotification(t('notification.commercial_mode_restart_required'), 'warning');
@@ -390,7 +411,7 @@ export function ConfigPage() {
 
   // Keep bottom floating actions from covering page content by syncing its height to a CSS variable.
   useLayoutEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !shouldRenderFloatingActions) return;
 
     const actionsEl = floatingActionsRef.current;
     if (!actionsEl) return;
@@ -411,7 +432,7 @@ export function ConfigPage() {
       window.removeEventListener('resize', updatePadding);
       document.documentElement.style.removeProperty('--config-action-bar-height');
     };
-  }, []);
+  }, [shouldRenderFloatingActions]);
 
   // CodeMirror extensions
   const extensions = useMemo(
@@ -439,6 +460,21 @@ export function ConfigPage() {
     return '';
   };
 
+  const getFloatingStatusText = () => {
+    if (!isMobile) return getStatusText();
+    if (disableControls)
+      return t('config_management.status_disconnected_short', { defaultValue: 'Disconnected' });
+    if (loading) return t('config_management.status_loading_short', { defaultValue: 'Loading' });
+    if (error) return t('config_management.status_load_failed_short', { defaultValue: 'Failed' });
+    if (hasVisualModeError)
+      return t('config_management.visual_mode_unavailable_short', { defaultValue: 'YAML issue' });
+    if (hasVisualValidationErrors)
+      return t('config_management.visual.validation_blocked_short', { defaultValue: 'Fix errors' });
+    if (saving) return t('config_management.status_saving_short', { defaultValue: 'Saving' });
+    if (isDirty) return t('config_management.status_dirty_short', { defaultValue: 'Unsaved' });
+    return t('config_management.status_loaded_short', { defaultValue: 'Loaded' });
+  };
+
   const handleReload = useCallback(() => {
     if (!isDirty) {
       void loadConfig();
@@ -460,7 +496,13 @@ export function ConfigPage() {
   const floatingActions = (
     <div className={styles.floatingActionContainer} ref={floatingActionsRef}>
       <div className={styles.floatingActionList}>
-        <div className={`${styles.floatingStatus} ${getStatusClass()}`}>{getStatusText()}</div>
+        <div
+          className={`${styles.floatingStatus} ${
+            isMobile ? styles.floatingStatusCompact : ''
+          } ${getStatusClass()}`}
+        >
+          {getFloatingStatusText()}
+        </div>
         <button
           type="button"
           className={styles.floatingActionButton}
@@ -667,8 +709,9 @@ export function ConfigPage() {
             : t('config_management.model_price_persist_hint')
         }
       />
-
-      {typeof document !== 'undefined' ? createPortal(floatingActions, document.body) : null}
+      {shouldRenderFloatingActions && typeof document !== 'undefined'
+        ? createPortal(floatingActions, document.body)
+        : null}
       <DiffModal
         open={diffModalOpen}
         original={serverYaml}
